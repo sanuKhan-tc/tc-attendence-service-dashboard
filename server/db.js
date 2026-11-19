@@ -1,11 +1,31 @@
 import dotenv from 'dotenv';
-import sql from 'mssql/msnodesqlv8.js';
 import { BIOMETRIC_DEVICES } from './attendance.js';
 import { buildAttendanceHistoryQuery, buildAttendanceQuery, buildAttendanceUsersQuery, buildLatestAttendanceDateQuery } from './query.js';
 
 dotenv.config();
+const { default: sql } = process.env.DB_DRIVER === 'tedious'
+  ? await import('mssql')
+  : await import('mssql/msnodesqlv8.js');
 
 function config() {
+  if (process.env.DB_DRIVER === 'tedious') {
+    const serverValue = (process.env.DB_SERVER || 'localhost').replace(/^tcp:/i, '');
+    const [server, portValue] = serverValue.split(',');
+    return {
+      server,
+      port: Number(portValue || 1433),
+      user: process.env.DB_USER,
+      password: process.env.DB_PASSWORD,
+      database: process.env.DB_DATABASE || 'COSEC',
+      requestTimeout: 30000,
+      connectionTimeout: 30000,
+      options: {
+        encrypt: process.env.DB_ENCRYPT === 'true',
+        trustServerCertificate: true,
+      },
+    };
+  }
+
   return {
     connectionString: process.env.DB_CONNECTION_STRING
       || `Driver={ODBC Driver 18 for SQL Server};Server=${process.env.DB_SERVER || 'localhost'};Database=${process.env.DB_DATABASE || 'COSEC'};Trusted_Connection=Yes;TrustServerCertificate=Yes;`,

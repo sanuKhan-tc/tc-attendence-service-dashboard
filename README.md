@@ -79,6 +79,10 @@ DOCKER_DB_SERVER=host.docker.internal,1433
 | --- | --- | --- |
 | `DB_SERVER` | `localhost` | SQL Server host or instance. |
 | `DOCKER_DB_SERVER` | `host.docker.internal,1433` | SQL Server host and TCP port used by Docker. |
+| `DOCKER_DB_DRIVER` | `tedious` | Docker SQL client; use `tedious` for SQL authentication. |
+| `DOCKER_DB_USER` | — | SQL login used by Docker. |
+| `DOCKER_DB_PASSWORD` | — | Password for the Docker SQL login. |
+| `DOCKER_DB_ENCRYPT` | `false` | Enables SQL transport encryption when set to `true`. |
 | `DOCKER_DB_CONNECTION_STRING` | — | Optional complete connection string used only by Docker. |
 | `DB_DATABASE` | `COSEC` | Database containing COSEC attendance data. |
 | `PORT` | `3001` | Express API port. |
