@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build output and coverage
+dist/
+coverage/
+.vite/
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local editor and OS files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+docs/
+AGENTS.md
