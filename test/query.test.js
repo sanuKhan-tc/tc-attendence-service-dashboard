@@ -10,7 +10,8 @@ test('builds a read-only biometric attendance query for the hard-coded devices',
   assert.match(normalized, /^WITH/);
   assert.match(normalized, /FROM DBO\.MX_DATDTRN/);
   assert.match(normalized, /P1MID/);
-  assert.match(normalized, /@ATTENDANCEDATE/);
+  assert.match(normalized, /@STARTDATE/);
+  assert.match(normalized, /@ENDDATE/);
   assert.match(normalized, /OFFSET @PAGEOFFSET ROWS FETCH NEXT @PAGESIZE ROWS ONLY/);
   assert.match(normalized, /COUNT\(\*\) OVER\(\)/);
   assert.match(normalized, /R\.LATE = 1 OR R\.EARLY = 1 OR R\.UNDEREIGHT = 1/);

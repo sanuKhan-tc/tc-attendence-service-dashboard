@@ -104,7 +104,7 @@ ${pageClause};`;
 export function buildAttendanceQuery(devices) {
   return buildScopedAttendanceQuery(
     devices,
-    'a.PDate >= CONVERT(date, @attendanceDate) AND a.PDate < DATEADD(day, 1, CONVERT(date, @attendanceDate))',
+    'a.PDate >= CONVERT(date, @startDate) AND a.PDate < DATEADD(day, 1, CONVERT(date, @endDate))',
     '',
     { paginated: true },
   );

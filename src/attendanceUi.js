@@ -12,6 +12,12 @@ export function dataSourceLabel(value) {
   return String(value).toLowerCase() === 'true' ? 'Live data' : 'Local backup data';
 }
 
+export function formatDateRange(startDate, endDate) {
+  if (!startDate && !endDate) return 'Latest available';
+  if (startDate === endDate || !endDate) return startDate;
+  return `${startDate} – ${endDate}`;
+}
+
 export function filterAttendanceRows(rows, { location, search, tab }) {
   const query = search.trim().toLowerCase();
 

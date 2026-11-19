@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatTime, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTime, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -45,4 +45,10 @@ test('labels the configured attendance source', () => {
   assert.equal(dataSourceLabel('true'), 'Live data');
   assert.equal(dataSourceLabel('false'), 'Local backup data');
   assert.equal(dataSourceLabel(undefined), 'Local backup data');
+});
+
+test('formats overview date ranges', () => {
+  assert.equal(formatDateRange('', ''), 'Latest available');
+  assert.equal(formatDateRange('2026-10-12', '2026-10-12'), '2026-10-12');
+  assert.equal(formatDateRange('2026-10-01', '2026-10-12'), '2026-10-01 – 2026-10-12');
 });

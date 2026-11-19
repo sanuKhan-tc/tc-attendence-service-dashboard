@@ -4,7 +4,7 @@ Read-only attendance reporting for biometric face identification at the Dubai of
 
 ## What it includes
 
-- Daily attendance overview with late arrival, early checkout, and under-eight-hour flags.
+- Attendance overview with start/end date filters and late arrival, early checkout, and under-eight-hour flags.
 - Dubai and India location filters with employee search.
 - Server-side pagination with 10 records per page.
 - Employee history reports for a selected date range.
@@ -110,6 +110,32 @@ pnpm server
 
 Then open <http://localhost:3001>.
 
+## Docker deployment
+
+The project includes a single multi-stage image and a one-service Compose file. The container serves the built frontend and Express API together on port `9200`:
+
+```powershell
+docker compose up --build -d
+```
+
+Open <http://localhost:9200>.
+
+By default, the container connects to SQL Server on the host through `host.docker.internal` and uses the `COSEC` database. To point it at another SQL Server, set these values before starting Compose:
+
+```powershell
+$env:DOCKER_DB_SERVER = 'host.docker.internal'
+$env:DB_DATABASE = 'COSEC'
+docker compose up --build -d
+```
+
+If the database requires an ODBC connection-string override, set `DB_CONNECTION_STRING` in the Compose environment. The connection string must be reachable from inside the container and should use SQL authentication or another authentication method available to the container. Windows integrated authentication from the host is not automatically forwarded into a Linux container.
+
+Stop the service with:
+
+```powershell
+docker compose down
+```
+
 ## API endpoints
 
 ### Daily attendance
@@ -120,14 +146,16 @@ GET /api/attendance
 
 Supported query parameters:
 
-- `date=YYYY-MM-DD`
+- `startDate=YYYY-MM-DD`
+- `endDate=YYYY-MM-DD`
+- `date=YYYY-MM-DD` (backward-compatible single-day shortcut)
 - `page=1`
 - `pageSize=10`
 - `location=All|Dubai|India`
 - `search=name-or-user-id`
 - `tab=all|late|early|underEight`
 
-When `date` is omitted, the API selects the latest available biometric date.
+When both date filters are omitted, the API selects the latest available biometric date and uses it for both boundaries. If only one boundary is provided, the API uses that date for the other boundary.
 
 ### Employee list
 

@@ -1,0 +1,23 @@
+services:
+  attendance-dashboard:
+    build:
+      context: .
+      args:
+        VITE_LIVE_DATA_ENABLED: ${VITE_LIVE_DATA_ENABLED:-false}
+    image: tc-attendance-dashboard:local
+    ports:
+      - "9200:3001"
+    environment:
+      PORT: 3001
+      DB_SERVER: ${DOCKER_DB_SERVER:-host.docker.internal}
+      DB_DATABASE: ${DB_DATABASE:-COSEC}
+      DB_CONNECTION_STRING: ${DB_CONNECTION_STRING:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

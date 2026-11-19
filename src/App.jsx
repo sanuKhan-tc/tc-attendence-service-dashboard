@@ -5,6 +5,7 @@ import {
   dataSourceLabel,
   filterAttendanceRows,
   filterEmployeeOptions,
+  formatDateRange,
   formatTime,
   presentDaysLabel,
 } from './attendanceUi.js';
@@ -460,7 +461,7 @@ function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
   );
 }
 
-function DashboardPage({ date, setDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage }) {
+function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage }) {
   const isLoading = state === 'loading';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
@@ -476,7 +477,7 @@ function DashboardPage({ date, setDate, location, setLocation, search, setSearch
         </div>
         <div className="hero-meta">
           <span className="meta-pill">{location === 'All' ? 'Dubai & India' : location}</span>
-          {date && <span className="meta-pill meta-date">{date}</span>}
+          <span className="meta-pill meta-date">{formatDateRange(startDate, endDate)}</span>
         </div>
       </section>
 
@@ -491,8 +492,12 @@ function DashboardPage({ date, setDate, location, setLocation, search, setSearch
           </div>
         </label>
         <label>
-          <span>Date</span>
-          <input type="date" value={date} onChange={(event) => setDate(event.target.value)} />
+          <span>Start date</span>
+          <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+        </label>
+        <label>
+          <span>End date</span>
+          <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
         </label>
         <label>
           <span>Location</span>
@@ -513,7 +518,7 @@ function DashboardPage({ date, setDate, location, setLocation, search, setSearch
       {isLoading ? <SummaryCardsSkeleton /> : <SummaryCards summary={report.summary} />}
 
       <section className="flagged-card">
-        <div className="section-title"><h2>Flagged staff</h2><div className="section-actions"><span className="scope-note">Biometric attendance only</span><button className="reset-button" type="button" onClick={() => downloadAttendanceExcel(visibleRows, `attendance-${date || 'latest'}-page-${pagination.page}`)} disabled={state !== 'ready' || visibleRows.length === 0}>Export Excel</button></div></div>
+        <div className="section-title"><h2>Flagged staff</h2><div className="section-actions"><span className="scope-note">Biometric attendance only</span><button className="reset-button" type="button" onClick={() => downloadAttendanceExcel(visibleRows, `attendance-${startDate || 'latest'}-to-${endDate || startDate || 'latest'}-page-${pagination.page}`)} disabled={state !== 'ready' || visibleRows.length === 0}>Export Excel</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
         <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead><tbody>
           {isLoading && <TableRowsSkeleton rows={6} showEmployee />}
@@ -690,7 +695,8 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
 
 function App() {
   const [page, setPage] = useState(() => window.location.hash === '#user-report' ? 'user-report' : 'dashboard');
-  const [date, setDate] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [location, setLocation] = useState('All');
   const [search, setSearch] = useState('');
   const [tab, setTab] = useState('all');
@@ -725,37 +731,39 @@ function App() {
 
   useEffect(() => {
     setPageNumber(1);
-  }, [date, location, search, tab]);
+  }, [startDate, endDate, location, search, tab]);
 
   useEffect(() => {
     const controller = new AbortController();
     setState('loading');
     setError('');
     const params = new URLSearchParams({ page: String(pageNumber), pageSize: '10', location, search, tab });
-    if (date) params.set('date', date);
+    if (startDate) params.set('startDate', startDate);
+    if (endDate) params.set('endDate', endDate);
     const endpoint = `/api/attendance?${params.toString()}`;
     fetch(endpoint, { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('Unable to load attendance'); return response.json(); }).then((nextReport) => {
-      if (!date && nextReport.date) setDate(nextReport.date);
-      if (!historyFrom && nextReport.date) setHistoryFrom(nextReport.date);
-      if (!historyTo && nextReport.date) setHistoryTo(nextReport.date);
-      if (!calendarMonth && nextReport.date) setCalendarMonth(nextReport.date.slice(0, 7));
+      if (!startDate && nextReport.startDate) setStartDate(nextReport.startDate);
+      if (!endDate && nextReport.endDate) setEndDate(nextReport.endDate);
+      if (!historyFrom && nextReport.startDate) setHistoryFrom(nextReport.startDate);
+      if (!historyTo && nextReport.endDate) setHistoryTo(nextReport.endDate);
+      if (!calendarMonth && nextReport.endDate) setCalendarMonth(nextReport.endDate.slice(0, 7));
       setReport(nextReport);
       setPagination(nextReport.pagination || { page: pageNumber, pageSize: 10, total: nextReport.rows.length, totalPages: 1 });
       setState('ready');
     }).catch((requestError) => { if (requestError.name !== 'AbortError') { setError(requestError.message); setState('error'); } });
     return () => controller.abort();
-  }, [date, location, pageNumber, search, tab]);
+  }, [startDate, endDate, location, pageNumber, search, tab]);
 
   const userOptions = useMemo(() => [...(users.length ? users : report.rows)].sort((a, b) => a.employee.localeCompare(b.employee)), [report.rows, users]);
 
   function openUserReport(userId) {
     setSelectedUserId(userId);
-    setCalendarMonth((historyTo || date || '2026-01').slice(0, 7));
+    setCalendarMonth((historyTo || endDate || startDate || '2026-01').slice(0, 7));
     window.location.hash = 'user-report';
   }
 
   function resetFilters() {
-    setDate(''); setLocation('All'); setSearch(''); setTab('all'); setPageNumber(1);
+    setStartDate(''); setEndDate(''); setLocation('All'); setSearch(''); setTab('all'); setPageNumber(1);
   }
 
   function loadUserHistory() {
@@ -771,8 +779,10 @@ function App() {
       <main className="app-shell">
         {page === 'dashboard' ? (
           <DashboardPage
-            date={date}
-            setDate={setDate}
+            startDate={startDate}
+            setStartDate={setStartDate}
+            endDate={endDate}
+            setEndDate={setEndDate}
             location={location}
             setLocation={setLocation}
             search={search}
@@ -801,7 +811,7 @@ function App() {
             history={history}
             historyState={historyState}
             historyError={historyError}
-            calendarMonth={calendarMonth || (historyTo || date || '2026-01').slice(0, 7)}
+            calendarMonth={calendarMonth || (historyTo || endDate || startDate || '2026-01').slice(0, 7)}
             setCalendarMonth={setCalendarMonth}
           />
         )}

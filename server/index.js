@@ -2,6 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import dotenv from 'dotenv';
+import { resolveAttendanceDateRange } from './dateRange.js';
 import { fetchAttendanceHistoryRows, fetchAttendanceRows, fetchAttendanceUsers, fetchLatestAttendanceDate } from './db.js';
 import { toClientReport } from './attendance.js';
 
@@ -24,21 +25,31 @@ function boundedInteger(value, fallback, minimum, maximum) {
 }
 
 app.get('/api/attendance', async (request, response) => {
+  const requestedStartDate = String(request.query.startDate || request.query.date || '').trim();
+  const requestedEndDate = String(request.query.endDate || request.query.date || '').trim();
+
   try {
-    const date = request.query.date || await fetchLatestAttendanceDate() || today();
+    const fallbackDate = requestedStartDate || requestedEndDate ? '' : await fetchLatestAttendanceDate() || today();
+    const { startDate, endDate } = resolveAttendanceDateRange(requestedStartDate, requestedEndDate, fallbackDate);
     const page = boundedInteger(request.query.page, 1, 1, 100000);
     const pageSize = boundedInteger(request.query.pageSize, 10, 1, 100);
     const location = ['All', 'Dubai', 'India'].includes(request.query.location) ? request.query.location : 'All';
     const tab = ['all', 'late', 'early', 'underEight'].includes(request.query.tab) ? request.query.tab : 'all';
     const search = String(request.query.search || '').trim().slice(0, 100);
-    const result = await fetchAttendanceRows(date, { page, pageSize, location, search, tab });
+    const result = await fetchAttendanceRows(startDate, endDate, { page, pageSize, location, search, tab });
     response.json({
-      date,
+      date: startDate === endDate ? startDate : null,
+      startDate,
+      endDate,
       ...toClientReport(result.rows),
       summary: result.summary,
       pagination: { page, pageSize, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / pageSize)) },
     });
   } catch (error) {
+    if (error instanceof RangeError) {
+      response.status(400).json({ error: error.message });
+      return;
+    }
     console.error(error);
     response.status(500).json({ error: 'Unable to read attendance from COSEC.' });
   }

@@ -13,11 +13,12 @@ function config() {
   };
 }
 
-export async function fetchAttendanceRows(date, { page = 1, pageSize = 10, location = 'All', search = '', tab = 'all' } = {}) {
+export async function fetchAttendanceRows(startDate, endDate, { page = 1, pageSize = 10, location = 'All', search = '', tab = 'all' } = {}) {
   const pool = await sql.connect(config());
   try {
     const recordset = (await pool.request()
-      .input('attendanceDate', sql.Date, date)
+      .input('startDate', sql.Date, startDate)
+      .input('endDate', sql.Date, endDate)
       .input('pageOffset', sql.Int, (page - 1) * pageSize)
       .input('pageSize', sql.Int, pageSize)
       .input('location', sql.NVarChar(20), location)
