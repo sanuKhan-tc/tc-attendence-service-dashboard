@@ -123,7 +123,7 @@ docker compose up --build -d
 
 Open <http://localhost:9200>.
 
-By default, the container connects to the host SQL Server through `host.docker.internal,1433` and uses the `COSEC` database. SQL Server TCP/IP must be enabled and port 1433 must be reachable from Docker. To point it at another SQL Server, set these values before starting Compose:
+By default, the container connects to the host SQL Server through `tcp:host.docker.internal,1433` and uses the `COSEC` database. SQL Server TCP/IP must be enabled and port 1433 must be reachable from Docker. To point it at another SQL Server, set these values before starting Compose:
 
 ```powershell
 $env:DOCKER_DB_SERVER = 'host.docker.internal,1433'
