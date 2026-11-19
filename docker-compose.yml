@@ -9,7 +9,7 @@ services:
       - "9200:3001"
     environment:
       PORT: 3001
-      DB_SERVER: ${DOCKER_DB_SERVER:-host.docker.internal}
+      DB_SERVER: ${DOCKER_DB_SERVER:-host.docker.internal,1433}
       DB_DATABASE: ${DB_DATABASE:-COSEC}
       DB_CONNECTION_STRING: ${DB_CONNECTION_STRING:-}
     extra_hosts:

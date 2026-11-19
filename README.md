@@ -72,11 +72,13 @@ DB_SERVER=localhost
 DB_DATABASE=COSEC
 PORT=3001
 VITE_LIVE_DATA_ENABLED=false
+DOCKER_DB_SERVER=host.docker.internal,1433
 ```
 
 | Variable | Default | Description |
 | --- | --- | --- |
 | `DB_SERVER` | `localhost` | SQL Server host or instance. |
+| `DOCKER_DB_SERVER` | `host.docker.internal,1433` | SQL Server host and TCP port used by Docker. |
 | `DB_DATABASE` | `COSEC` | Database containing COSEC attendance data. |
 | `PORT` | `3001` | Express API port. |
 | `DB_CONNECTION_STRING` | — | Optional complete ODBC connection string. |
@@ -120,10 +122,10 @@ docker compose up --build -d
 
 Open <http://localhost:9200>.
 
-By default, the container connects to SQL Server on the host through `host.docker.internal` and uses the `COSEC` database. To point it at another SQL Server, set these values before starting Compose:
+By default, the container connects to the host SQL Server through `host.docker.internal,1433` and uses the `COSEC` database. SQL Server TCP/IP must be enabled and port 1433 must be reachable from Docker. To point it at another SQL Server, set these values before starting Compose:
 
 ```powershell
-$env:DOCKER_DB_SERVER = 'host.docker.internal'
+$env:DOCKER_DB_SERVER = 'host.docker.internal,1433'
 $env:DB_DATABASE = 'COSEC'
 docker compose up --build -d
 ```
