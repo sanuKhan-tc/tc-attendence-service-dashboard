@@ -13,7 +13,7 @@ import {
 import { fetchAllAttendanceRows } from './attendanceExport.js';
 import versionInfo from '../version.json';
 
-const LOCATIONS = ['All', 'Dubai', 'India', 'India - Hyderabad', 'India - Noida', 'India - Chennai', 'India - Cafeteria'];
+const LOCATIONS = ['All', 'Dubai', 'India', 'India - Hyderabad', 'India - Noida', 'India - Chennai'];
 const TABS = [
   { id: 'all', label: 'All flagged' },
   { id: 'late', label: 'Late arrivals' },

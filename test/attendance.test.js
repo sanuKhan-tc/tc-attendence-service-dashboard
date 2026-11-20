@@ -18,7 +18,7 @@ test('keeps the hard-coded biometric device locations and workday rules', () => 
     { mid: 12, name: 'TC-Hyderabad', location: 'India - Hyderabad', lateCutoff: '10:00', officeEnd: '18:30' },
     { mid: 13, name: 'TC-Noida', location: 'India - Noida', lateCutoff: '10:00', officeEnd: '18:30' },
     { mid: 16, name: 'TC- Chennai', location: 'India - Chennai', lateCutoff: '10:30', officeEnd: '19:00' },
-    { mid: 14, name: 'techcarrot-Cafeteria', location: 'India - Cafeteria', lateCutoff: '10:00', officeEnd: '18:30' },
+    { mid: 14, name: 'techcarrot-Cafeteria', location: 'India', lateCutoff: '10:00', officeEnd: '18:30' },
   ]);
 });
 

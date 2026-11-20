@@ -5,14 +5,14 @@ export const BIOMETRIC_DEVICES = [
   { mid: 12, name: 'TC-Hyderabad', location: 'India - Hyderabad', lateCutoff: '10:00', officeEnd: '18:30' },
   { mid: 13, name: 'TC-Noida', location: 'India - Noida', lateCutoff: '10:00', officeEnd: '18:30' },
   { mid: 16, name: 'TC- Chennai', location: 'India - Chennai', lateCutoff: '10:30', officeEnd: '19:00' },
-  { mid: 14, name: 'techcarrot-Cafeteria', location: 'India - Cafeteria', lateCutoff: '10:00', officeEnd: '18:30' },
+  { mid: 14, name: 'techcarrot-Cafeteria', location: 'India', lateCutoff: '10:00', officeEnd: '18:30' },
 ];
 
 export const ALLOWED_LOCATIONS = [
   'All',
   'Dubai',
   'India',
-  ...new Set(BIOMETRIC_DEVICES.map((device) => device.location).filter((location) => location !== 'Dubai')),
+  ...new Set(BIOMETRIC_DEVICES.map((device) => device.location).filter((location) => location !== 'Dubai' && location !== 'India')),
 ];
 
 const deviceRules = new Map(BIOMETRIC_DEVICES.map((device) => [device.location, device]));
