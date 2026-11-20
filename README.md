@@ -10,6 +10,7 @@ Read-only attendance reporting for biometric face identification at the Dubai of
 - Employee history reports for a selected date range.
 - Monthly calendar and attendance charts for employee history.
 - Excel export for all filtered overview records and loaded employee history.
+- Changelog page generated from dated commit messages on the current branch.
 - Read-only attendance access; no attendance data writes or schema changes. The setup script creates only the SQL login, database user, and read-only role membership.
 
 ## Attendance scope
@@ -56,7 +57,7 @@ The Vite development server proxies `/api` requests to the Express API. The Expr
 .\scripts\setup-and-run.ps1
 ```
 
-The setup script uses Windows SQL authentication to create the read-only SQL login `tc_attendance_reader`, creates its `COSEC` database user with `db_datareader` access, creates `.env` on the first run, and builds/starts the Docker container.
+The setup script pulls the latest Git changes on every restart, reads and displays the application version from `version.json`, then uses Windows SQL authentication to create the read-only SQL login `tc_attendance_reader`, creates its `COSEC` database user with `db_datareader` access, creates `.env` on the first run, and builds/starts the Docker container. It prints a confirmation after the pull completes.
 
 Open <http://localhost:9200>.
 
@@ -126,7 +127,13 @@ pnpm dev       # Start Vite and Express together
 pnpm server    # Start the Express server only
 pnpm build     # Build the frontend into dist/
 pnpm test      # Run the Node test suite
+pnpm version:show   # Show version.json
+pnpm version:patch  # Increment patch version
+pnpm version:minor  # Increment minor version
+pnpm version:major  # Increment major version
 ```
+
+`version.json` is the single version source for the setup script, frontend footer, and Docker build. The version commands update that file using semantic versioning.
 
 Production-style local run:
 

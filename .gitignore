@@ -5,6 +5,7 @@ node_modules/
 dist/
 coverage/
 .vite/
+public/changelog.json
 
 # Local environment and secrets
 .env

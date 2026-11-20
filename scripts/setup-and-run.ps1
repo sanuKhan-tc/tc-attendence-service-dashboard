@@ -15,6 +15,32 @@ function Require-Command([string]$Name) {
   }
 }
 
+Require-Command 'git'
+Write-Host 'Pulling latest updates...' -ForegroundColor Cyan
+& git pull --ff-only
+if ($LASTEXITCODE -ne 0) {
+  throw 'Git pull failed. Commit or stash local tracked changes before restarting.'
+}
+Write-Host 'Latest updates pulled.' -ForegroundColor Green
+
+$versionPath = Join-Path $repoRoot 'version.json'
+if (-not (Test-Path $versionPath)) {
+  throw 'version.json was not found.'
+}
+
+$versionInfo = Get-Content -Path $versionPath -Raw | ConvertFrom-Json
+$appVersion = [string]$versionInfo.version
+if ($appVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
+  throw 'version.json must contain a valid semantic version.'
+}
+Write-Host "Application version: $appVersion" -ForegroundColor Cyan
+
+Require-Command 'node'
+& node scripts/generate-changelog.mjs
+if ($LASTEXITCODE -ne 0) {
+  throw 'Changelog generation failed.'
+}
+
 if ($ReadUser -notmatch '^[A-Za-z_][A-Za-z0-9_]*$') {
   throw 'ReadUser must contain only letters, numbers, and underscores, and cannot start with a number.'
 }

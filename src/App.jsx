@@ -10,6 +10,7 @@ import {
   presentDaysLabel,
 } from './attendanceUi.js';
 import { fetchAllAttendanceRows } from './attendanceExport.js';
+import versionInfo from '../version.json';
 
 const LOCATIONS = ['All', 'Dubai', 'India'];
 const TABS = [
@@ -22,9 +23,16 @@ const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTH_FORMATTER = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const SKELETON_BAR_HEIGHTS = [72, 86, 54, 92, 68, 45, 80, 76, 62, 88];
 const DATA_SOURCE_LABEL = dataSourceLabel(import.meta.env.VITE_LIVE_DATA_ENABLED);
+const APP_VERSION = versionInfo.version;
 const SEARCH_DEBOUNCE_MS = 250;
 const CLIENT_CACHE_TTL_MS = 30_000;
 const CLIENT_CACHE_MAX = 25;
+
+function pageFromHash() {
+  if (window.location.hash === '#user-report') return 'user-report';
+  if (window.location.hash === '#changelog') return 'changelog';
+  return 'dashboard';
+}
 
 function getCachedEntry(cache, key) {
   const entry = cache.get(key);
@@ -173,6 +181,7 @@ const Navigation = memo(function Navigation({ page, dataSource }) {
         <div className="nav-links">
           <a className={page === 'dashboard' ? 'nav-link active' : 'nav-link'} href="#dashboard">Overview</a>
           <a className={page === 'user-report' ? 'nav-link active' : 'nav-link'} href="#user-report">User reports</a>
+          <a className={page === 'changelog' ? 'nav-link active' : 'nav-link'} href="#changelog">Changelog</a>
         </div>
         <span className="nav-scope">
           <span className="status-dot" aria-hidden="true" />
@@ -747,8 +756,53 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
   );
 }
 
+function ChangelogPage() {
+  const [entries, setEntries] = useState([]);
+  const [state, setState] = useState('loading');
+
+  useEffect(() => {
+    fetch('/changelog.json')
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load changelog');
+        return response.json();
+      })
+      .then((nextEntries) => {
+        setEntries(Array.isArray(nextEntries) ? nextEntries : []);
+        setState('ready');
+      })
+      .catch(() => setState('error'));
+  }, []);
+
+  return (
+    <section className="changelog-page" aria-label="Application changelog">
+      <div className="page-hero changelog-hero">
+        <div>
+          <span className="hero-eyebrow">Release history</span>
+          <h1 className="hero-title">Changelog</h1>
+          <p className="page-subtitle">Recent project updates from the main branch.</p>
+        </div>
+        <span className="meta-pill meta-date">v{APP_VERSION}</span>
+      </div>
+      <div className="changelog-list">
+        {state === 'loading' && <p className="changelog-message">Loading changelog…</p>}
+        {state === 'error' && <p className="changelog-message error-message">Unable to load changelog.</p>}
+        {state === 'ready' && entries.length === 0 && <p className="changelog-message">No changelog entries available.</p>}
+        {state === 'ready' && entries.map((entry) => (
+          <article className="changelog-entry" key={entry.hash}>
+            <time dateTime={entry.date}>{entry.date}</time>
+            <div>
+              <h2>{entry.message}</h2>
+              <span className="changelog-hash">{entry.shortHash}</span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function App() {
-  const [page, setPage] = useState(() => window.location.hash === '#user-report' ? 'user-report' : 'dashboard');
+  const [page, setPage] = useState(pageFromHash);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [location, setLocation] = useState('All');
@@ -778,7 +832,7 @@ function App() {
   const historyAbortRef = useRef(null);
 
   useEffect(() => {
-    const onHashChange = () => setPage(window.location.hash === '#user-report' ? 'user-report' : 'dashboard');
+    const onHashChange = () => setPage(pageFromHash());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
@@ -1004,7 +1058,7 @@ function App() {
             isExporting={isExporting}
             exportError={exportError}
           />
-        ) : (
+        ) : page === 'user-report' ? (
           <UserReportPage
             userOptions={userOptions}
             usersLoading={usersLoading}
@@ -1021,11 +1075,11 @@ function App() {
             calendarMonth={calendarMonth || (historyTo || endDate || startDate || '2026-01').slice(0, 7)}
             setCalendarMonth={setCalendarMonth}
           />
-        )}
+        ) : <ChangelogPage />}
       </main>
       <footer className="site-footer">
-        <span>techcarrot · Digital Transformation Partner</span>
-        <span>Attendance Portal</span>
+        <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
+        <span className="footer-version">v{APP_VERSION}</span>
       </footer>
     </div>
   );

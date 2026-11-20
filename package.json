@@ -3,10 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/generate-changelog.mjs",
     "dev": "concurrently \"node server/index.js\" \"vite\"",
     "server": "node server/index.js",
+    "prebuild": "node scripts/generate-changelog.mjs",
     "build": "vite build",
-    "test": "node --test"
+    "test": "node --test",
+    "version:show": "node scripts/version.mjs show",
+    "version:patch": "node scripts/version.mjs patch",
+    "version:minor": "node scripts/version.mjs minor",
+    "version:major": "node scripts/version.mjs major"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
