@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTime, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -51,4 +51,9 @@ test('formats overview date ranges', () => {
   assert.equal(formatDateRange('', ''), 'Latest available');
   assert.equal(formatDateRange('2026-10-12', '2026-10-12'), '2026-10-12');
   assert.equal(formatDateRange('2026-10-01', '2026-10-12'), '2026-10-01 – 2026-10-12');
+});
+
+test('formats flagged-table dates as a single date or compact range', () => {
+  assert.equal(formatTableDateRange('2026-10-12', '2026-10-12'), '12/Oct');
+  assert.equal(formatTableDateRange('2026-10-01', '2026-10-12'), '01/Oct – 12/Oct');
 });

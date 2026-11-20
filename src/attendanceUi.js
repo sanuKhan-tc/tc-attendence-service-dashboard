@@ -18,6 +18,18 @@ export function formatDateRange(startDate, endDate) {
   return `${startDate} – ${endDate}`;
 }
 
+export function formatTableDateRange(startDate, endDate) {
+  const formatTableDate = (value) => {
+    if (!value) return 'Latest available';
+    const [year, month, day] = value.split('-').map(Number);
+    const monthName = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][month - 1];
+    return `${String(day).padStart(2, '0')}/${monthName}`;
+  };
+
+  if (!endDate || startDate === endDate) return formatTableDate(startDate || endDate);
+  return `${formatTableDate(startDate)} – ${formatTableDate(endDate)}`;
+}
+
 export function filterAttendanceRows(rows, { location, search, tab }) {
   const query = search.trim().toLowerCase();
 

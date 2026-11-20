@@ -2,8 +2,15 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import express from 'express';
 import dotenv from 'dotenv';
+import { createMemoryCache, resolveRangeTtl } from './cache.js';
 import { resolveAttendanceDateRange } from './dateRange.js';
-import { fetchAttendanceHistoryRows, fetchAttendanceRows, fetchAttendanceUsers, fetchLatestAttendanceDate } from './db.js';
+import {
+  closePool,
+  fetchAttendanceHistoryRows,
+  fetchAttendanceRows,
+  fetchAttendanceUsers,
+  fetchLatestAttendanceDate,
+} from './db.js';
 import { toClientReport } from './attendance.js';
 
 dotenv.config();
@@ -12,6 +19,21 @@ const app = express();
 const port = Number(process.env.PORT || 3001);
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
+
+const latestDateCache = createMemoryCache({ ttlMs: 60_000, staleTtlMs: 120_000, maxEntries: 1 });
+const usersCache = createMemoryCache({ ttlMs: 300_000, staleTtlMs: 600_000, maxEntries: 1 });
+const attendanceCache = createMemoryCache({ ttlMs: 30_000, staleTtlMs: 90_000, maxEntries: 150 });
+const historyCache = createMemoryCache({ ttlMs: 30_000, staleTtlMs: 90_000, maxEntries: 150 });
+
+function createRequestSignal(request, response) {
+  const controller = new AbortController();
+  const onClose = () => {
+    if (!response.writableEnded) controller.abort();
+  };
+  request.on('close', onClose);
+  response.once('finish', () => request.off('close', onClose));
+  return controller.signal;
+}
 
 function today() {
   const now = new Date();
@@ -24,28 +46,58 @@ function boundedInteger(value, fallback, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, parsed));
 }
 
+function isForceRefresh(request) {
+  return request.query.refresh === '1' || request.query.refresh === 'true';
+}
+
+async function buildAttendanceJson(startDate, endDate, { page, pageSize, location, search, tab, signal }) {
+  const result = await fetchAttendanceRows(startDate, endDate, { page, pageSize, location, search, tab, signal });
+  return JSON.stringify({
+    date: startDate === endDate ? startDate : null,
+    startDate,
+    endDate,
+    ...toClientReport(result.rows),
+    summary: result.summary,
+    pagination: { page, pageSize, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / pageSize)) },
+  });
+}
+
 app.get('/api/attendance', async (request, response) => {
   const requestedStartDate = String(request.query.startDate || request.query.date || '').trim();
   const requestedEndDate = String(request.query.endDate || request.query.date || '').trim();
+  const forceRefresh = isForceRefresh(request);
+  const signal = createRequestSignal(request, response);
 
   try {
-    const fallbackDate = requestedStartDate || requestedEndDate ? '' : await fetchLatestAttendanceDate() || today();
+    const todayDate = today();
+    let fallbackDate = '';
+    if (!requestedStartDate && !requestedEndDate) {
+      const latest = await latestDateCache.getOrLoad('latest', () => fetchLatestAttendanceDate(), { forceRefresh });
+      fallbackDate = latest.value || todayDate;
+    }
+
     const { startDate, endDate } = resolveAttendanceDateRange(requestedStartDate, requestedEndDate, fallbackDate);
     const page = boundedInteger(request.query.page, 1, 1, 100000);
     const pageSize = boundedInteger(request.query.pageSize, 10, 1, 100);
     const location = ['All', 'Dubai', 'India'].includes(request.query.location) ? request.query.location : 'All';
     const tab = ['all', 'late', 'early', 'underEight'].includes(request.query.tab) ? request.query.tab : 'all';
     const search = String(request.query.search || '').trim().slice(0, 100);
-    const result = await fetchAttendanceRows(startDate, endDate, { page, pageSize, location, search, tab });
-    response.json({
-      date: startDate === endDate ? startDate : null,
-      startDate,
-      endDate,
-      ...toClientReport(result.rows),
-      summary: result.summary,
-      pagination: { page, pageSize, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / pageSize)) },
-    });
+    const cacheKey = `${startDate}|${endDate}|${page}|${pageSize}|${location}|${tab}|${search.toLowerCase()}`;
+    const ttlOverrideMs = resolveRangeTtl(endDate, todayDate);
+    const staleOverrideMs = endDate < todayDate ? 300_000 : 90_000;
+
+    const { value: json, status } = await attendanceCache.getOrLoad(
+      cacheKey,
+      () => buildAttendanceJson(startDate, endDate, { page, pageSize, location, search, tab, signal }),
+      { forceRefresh, coalesce: !forceRefresh, ttlOverrideMs, staleOverrideMs },
+    );
+
+    if (signal.aborted) return;
+    response.set('X-Cache', status);
+    response.set('Cache-Control', `private, max-age=${Math.round(ttlOverrideMs / 1000)}`);
+    response.type('application/json').send(json);
   } catch (error) {
+    if (error.name === 'AbortError' || signal.aborted) return;
     if (error instanceof RangeError) {
       response.status(400).json({ error: error.message });
       return;
@@ -59,32 +111,100 @@ app.get('/api/attendance/history', async (request, response) => {
   const userId = String(request.query.userId || '').trim();
   const from = String(request.query.from || '').trim();
   const to = String(request.query.to || '').trim();
+  const forceRefresh = isForceRefresh(request);
 
   if (!userId || !from || !to || from > to) {
     response.status(400).json({ error: 'userId, from, and to are required.' });
     return;
   }
 
+  const signal = createRequestSignal(request, response);
+  const todayDate = today();
+  const cacheKey = `${userId}|${from}|${to}`;
+  const ttlOverrideMs = resolveRangeTtl(to, todayDate);
+  const staleOverrideMs = to < todayDate ? 300_000 : 90_000;
+
   try {
-    const rows = await fetchAttendanceHistoryRows(userId, from, to);
-    response.json({ userId, from, to, ...toClientReport(rows) });
+    const { value: json, status } = await historyCache.getOrLoad(
+      cacheKey,
+      async () => {
+        const rows = await fetchAttendanceHistoryRows(userId, from, to, signal);
+        return JSON.stringify({ userId, from, to, ...toClientReport(rows) });
+      },
+      { forceRefresh, coalesce: !forceRefresh, ttlOverrideMs, staleOverrideMs },
+    );
+
+    if (signal.aborted) return;
+    response.set('X-Cache', status);
+    response.set('Cache-Control', `private, max-age=${Math.round(ttlOverrideMs / 1000)}`);
+    response.type('application/json').send(json);
   } catch (error) {
+    if (error.name === 'AbortError' || signal.aborted) return;
     console.error(error);
     response.status(500).json({ error: 'Unable to read user history from COSEC.' });
   }
 });
 
-app.get('/api/attendance/users', async (_request, response) => {
+app.get('/api/attendance/users', async (request, response) => {
+  const forceRefresh = isForceRefresh(request);
   try {
-    response.json({ users: await fetchAttendanceUsers() });
+    const { value: json, status } = await usersCache.getOrLoad(
+      'users',
+      async () => JSON.stringify({ users: await fetchAttendanceUsers() }),
+      { forceRefresh },
+    );
+    response.set('X-Cache', status);
+    response.set('Cache-Control', 'private, max-age=300');
+    response.type('application/json').send(json);
   } catch (error) {
     console.error(error);
     response.status(500).json({ error: 'Unable to read employees from COSEC.' });
   }
 });
 
+app.get('/api/cache/stats', (_request, response) => {
+  response.json({
+    latestDate: latestDateCache.getStats(),
+    users: usersCache.getStats(),
+    attendance: attendanceCache.getStats(),
+    history: historyCache.getStats(),
+  });
+});
+
 app.use(express.static(path.resolve(currentDir, '../dist')));
 
-app.listen(port, () => {
+async function warmCaches() {
+  try {
+    const todayDate = today();
+    const [latestResult] = await Promise.all([
+      latestDateCache.getOrLoad('latest', () => fetchLatestAttendanceDate()),
+      usersCache.getOrLoad('users', async () => JSON.stringify({ users: await fetchAttendanceUsers() })),
+    ]);
+    const latestDate = latestResult.value || todayDate;
+    const cacheKey = `${latestDate}|${latestDate}|1|10|All|all|`;
+    const ttlOverrideMs = resolveRangeTtl(latestDate, todayDate);
+    await attendanceCache.getOrLoad(
+      cacheKey,
+      () => buildAttendanceJson(latestDate, latestDate, { page: 1, pageSize: 10, location: 'All', search: '', tab: 'all' }),
+      { ttlOverrideMs },
+    );
+  } catch {
+    // Non-blocking warm-up: ignore startup DB errors so server stays ready
+  }
+}
+
+const server = app.listen(port, () => {
   console.log(`Attendance API listening on http://localhost:${port}`);
+  if (process.env.DISABLE_CACHE_WARMUP !== 'true') {
+    warmCaches();
+  }
 });
+
+async function shutdown() {
+  server.close();
+  await closePool();
+  process.exit(0);
+}
+
+process.once('SIGINT', shutdown);
+process.once('SIGTERM', shutdown);

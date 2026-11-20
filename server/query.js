@@ -5,12 +5,17 @@ function deviceMapSql(devices) {
 }
 
 function punchValuesSql() {
-  return Array.from({ length: 12 }, (_, index) => `    (a.P${index + 1}MID, a.Punch${index + 1}, ${index + 1})`).join(',\n');
+  return Array.from({ length: 12 }, (_, index) => `        (a.P${index + 1}MID, a.Punch${index + 1}, ${index + 1})`).join(',\n');
+}
+
+function devicePresenceFilterSql(mids) {
+  return Array.from({ length: 12 }, (_, index) => `a.P${index + 1}MID IN (${mids})`).join(' OR ');
 }
 
 function buildScopedAttendanceQuery(devices, dateFilter, userFilter = '', { paginated = false } = {}) {
   const mids = devices.map(({ mid }) => mid).join(', ');
   const punchValues = punchValuesSql();
+  const deviceFilter = devicePresenceFilterSql(mids);
   const pageFields = paginated ? `,
   COUNT(*) OVER() AS totalCount,
   SUM(r.late) OVER() AS totalLate,
@@ -26,6 +31,7 @@ WHERE (@location = N'All' OR r.location = @location)
     OR (@tab = N'underEight' AND r.underEight = 1)
   )` : '';
   const pageClause = paginated ? 'OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY' : '';
+  const queryOption = paginated ? '\nOPTION (RECOMPILE)' : '';
 
   return `
 WITH DeviceMap (MID, Location) AS (
@@ -52,6 +58,7 @@ WITH DeviceMap (MID, Location) AS (
   FROM dbo.Mx_DATDTrn AS a
   WHERE ${dateFilter}
     ${userFilter}
+    AND (${deviceFilter})
 ), ResolvedRows AS (
   SELECT
     a.UserID AS userId,
@@ -68,23 +75,21 @@ WITH DeviceMap (MID, Location) AS (
     SELECT
       MIN(p.PunchTime) AS FirstIn,
       MAX(p.PunchTime) AS LastEvent,
-      COUNT_BIG(*) AS EventCount
-    FROM (VALUES
+      COUNT_BIG(*) AS EventCount,
+      MAX(CASE WHEN p.rn = 1 THEN p.MID END) AS FirstMID
+    FROM (
+      SELECT
+        v.MID,
+        v.PunchTime,
+        ROW_NUMBER() OVER (ORDER BY v.PunchTime, v.PunchNo) AS rn
+      FROM (VALUES
 ${punchValues}
-    ) AS p(MID, PunchTime, PunchNo)
-    WHERE p.MID IN (${mids})
-      AND p.PunchTime IS NOT NULL
+      ) AS v(MID, PunchTime, PunchNo)
+      WHERE v.MID IN (${mids})
+        AND v.PunchTime IS NOT NULL
+    ) AS p
   ) AS punches
-  CROSS APPLY (
-    SELECT TOP (1) p.MID
-    FROM (VALUES
-${punchValues}
-    ) AS p(MID, PunchTime, PunchNo)
-    WHERE p.MID IN (${mids})
-      AND p.PunchTime IS NOT NULL
-    ORDER BY p.PunchTime, p.PunchNo
-  ) AS firstPunch
-  INNER JOIN DeviceMap AS m ON m.MID = firstPunch.MID
+  INNER JOIN DeviceMap AS m ON m.MID = punches.FirstMID
   LEFT JOIN dbo.Mx_UserMst AS u ON u.UserID = a.UserID
   WHERE punches.FirstIn IS NOT NULL
 )
@@ -98,7 +103,7 @@ SELECT
 FROM ResolvedRows AS r
 ${pageFilter}
 ORDER BY r.firstIn, r.userId
-${pageClause};`;
+${pageClause}${queryOption};`;
 }
 
 export function buildAttendanceQuery(devices) {

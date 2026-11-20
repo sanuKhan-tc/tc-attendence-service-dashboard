@@ -9,8 +9,8 @@ Read-only attendance reporting for biometric face identification at the Dubai of
 - Server-side pagination with 10 records per page.
 - Employee history reports for a selected date range.
 - Monthly calendar and attendance charts for employee history.
-- Excel export for the visible overview page and loaded employee history.
-- Read-only SQL access; no database writes or schema changes.
+- Excel export for all filtered overview records and loaded employee history.
+- Read-only attendance access; no attendance data writes or schema changes. The setup script creates only the SQL login, database user, and read-only role membership.
 
 ## Attendance scope
 
@@ -44,11 +44,31 @@ The Vite development server proxies `/api` requests to the Express API. The Expr
 
 - Node.js
 - pnpm
+- Docker Desktop with Compose
+- `sqlcmd` from the SQL Server command-line tools
 - Windows authentication access to the local SQL Server
-- SQL Server ODBC Driver 18
+- SQL Server TCP/IP enabled on port 1433
 - Access to the `COSEC` database
 
 ## Quick start
+
+```powershell
+.\scripts\setup-and-run.ps1
+```
+
+The setup script uses Windows SQL authentication to create the read-only SQL login `tc_attendance_reader`, creates its `COSEC` database user with `db_datareader` access, creates `.env` on the first run, and builds/starts the Docker container.
+
+Open <http://localhost:9200>.
+
+If `.env` already exists, the script prints `.env already installed; leaving it unchanged.` and does not overwrite it. To use a different local SQL Server or read-only login on the first run:
+
+```powershell
+.\scripts\setup-and-run.ps1 -SqlServer '.\SQLEXPRESS' -Database COSEC -ReadUser tc_attendance_reader
+```
+
+The first run must be started from an elevated Windows account with permission to create SQL logins and database users. If PowerShell blocks local scripts, run `Set-ExecutionPolicy -Scope Process Bypass` in the current terminal and retry.
+
+The combined development command remains available when Docker is not required:
 
 ```powershell
 pnpm install
@@ -56,7 +76,7 @@ Copy-Item .env.example .env
 pnpm dev
 ```
 
-Open <http://localhost:5173>.
+Open <http://localhost:5173> for development.
 
 The combined development command starts both services:
 

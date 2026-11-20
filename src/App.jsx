@@ -1,15 +1,15 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildCalendarWeeks,
   buildHistoryChartData,
   dataSourceLabel,
   filterAttendanceRows,
   filterEmployeeOptions,
-  formatDateRange,
+  formatTableDateRange,
   formatTime,
   presentDaysLabel,
 } from './attendanceUi.js';
-import { downloadAttendanceExcel } from './excelExport.js';
+import { fetchAllAttendanceRows } from './attendanceExport.js';
 
 const LOCATIONS = ['All', 'Dubai', 'India'];
 const TABS = [
@@ -18,8 +18,45 @@ const TABS = [
   { id: 'early', label: 'Early leavers' },
   { id: 'underEight', label: 'Under 8 hours' },
 ];
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_FORMATTER = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 const SKELETON_BAR_HEIGHTS = [72, 86, 54, 92, 68, 45, 80, 76, 62, 88];
 const DATA_SOURCE_LABEL = dataSourceLabel(import.meta.env.VITE_LIVE_DATA_ENABLED);
+const SEARCH_DEBOUNCE_MS = 250;
+const CLIENT_CACHE_TTL_MS = 30_000;
+const CLIENT_CACHE_MAX = 25;
+
+function getCachedEntry(cache, key) {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (entry.expiresAt <= Date.now()) {
+    cache.delete(key);
+    return null;
+  }
+  cache.delete(key);
+  cache.set(key, entry);
+  return entry.value;
+}
+
+function setCachedEntry(cache, key, value) {
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, { value, expiresAt: Date.now() + CLIENT_CACHE_TTL_MS });
+  if (cache.size > CLIENT_CACHE_MAX) {
+    cache.delete(cache.keys().next().value);
+  }
+}
+
+function buildAttendanceParams({ pageNumber, location, search, tab, startDate, endDate }) {
+  const params = new URLSearchParams({ page: String(pageNumber), pageSize: '10', location, search, tab });
+  if (startDate) params.set('startDate', startDate);
+  if (endDate) params.set('endDate', endDate);
+  return params;
+}
+
+async function exportAttendanceExcel(rows, filename) {
+  const { downloadAttendanceExcel } = await import('./excelExport.js');
+  downloadAttendanceExcel(rows, filename);
+}
 
 function initials(name) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
@@ -117,7 +154,7 @@ function CheckIcon() {
   );
 }
 
-function Navigation({ page, dataSource }) {
+const Navigation = memo(function Navigation({ page, dataSource }) {
   return (
     <header className="top-header">
       <div className="brand-bar" aria-hidden="true" />
@@ -144,7 +181,7 @@ function Navigation({ page, dataSource }) {
       </nav>
     </header>
   );
-}
+});
 
 function SummaryCardsSkeleton() {
   return (
@@ -163,7 +200,7 @@ function SummaryCardsSkeleton() {
   );
 }
 
-function TableRowsSkeleton({ rows = 6, showEmployee = true }) {
+function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false }) {
   return Array.from({ length: rows }, (_, index) => (
     <tr className="skeleton-row" key={index} aria-hidden="true">
       <td>
@@ -179,6 +216,7 @@ function TableRowsSkeleton({ rows = 6, showEmployee = true }) {
           <span className="skeleton skeleton-line w-90" />
         )}
       </td>
+      {showDate && <td><span className="skeleton skeleton-line w-64" /></td>}
       <td><span className="skeleton skeleton-pill w-64" /></td>
       <td><span className="skeleton skeleton-line w-56" /></td>
       <td><span className="skeleton skeleton-line w-56" /></td>
@@ -230,7 +268,7 @@ function ChartsSkeleton() {
   );
 }
 
-function SummaryCards({ summary, presentDaysRows }) {
+const SummaryCards = memo(function SummaryCards({ summary, presentDaysRows }) {
   return (
     <section className={presentDaysRows === undefined ? 'summary-grid' : 'summary-grid summary-grid-four'} aria-label="Attendance summary">
       <article className="summary-card late-card">
@@ -255,7 +293,7 @@ function SummaryCards({ summary, presentDaysRows }) {
           <span>Under 8 hours</span>
         </div>
         <strong>{summary.underEight || '—'}</strong>
-        <small>{summary.underEight ? 'Completed biometric intervals' : 'Available for completed intervals'}</small>
+        <small>{summary.underEight ? 'Completed work intervals' : 'Available for completed intervals'}</small>
       </article>
       {presentDaysRows !== undefined && (
         <article className="summary-card present-card">
@@ -264,14 +302,14 @@ function SummaryCards({ summary, presentDaysRows }) {
             <span>Days present</span>
           </div>
           <strong>{presentDaysLabel(presentDaysRows)}</strong>
-          <small>Days with biometric attendance</small>
+          <small>Days with recorded attendance</small>
         </article>
       )}
     </section>
   );
-}
+});
 
-function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
+const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
   const containerRef = useRef(null);
   const listRef = useRef(null);
   const selectedUser = useMemo(
@@ -280,6 +318,7 @@ function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
   );
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const deferredQuery = useDeferredValue(query);
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
@@ -287,11 +326,11 @@ function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
   }, [selectedUser]);
 
   const filteredOptions = useMemo(() => {
-    if (selectedUser && query === formatEmployeeLabel(selectedUser)) {
+    if (selectedUser && deferredQuery === formatEmployeeLabel(selectedUser)) {
       return options;
     }
-    return filterEmployeeOptions(options, query);
-  }, [options, query, selectedUser]);
+    return filterEmployeeOptions(options, deferredQuery);
+  }, [options, deferredQuery, selectedUser]);
 
   useEffect(() => {
     setActiveIndex(0);
@@ -459,9 +498,9 @@ function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
       )}
     </div>
   );
-}
+});
 
-function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage }) {
+function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError }) {
   const isLoading = state === 'loading';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
@@ -473,11 +512,11 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location,
       <section className="page-hero" aria-label="Attendance overview header">
         <div>
           <span className="hero-eyebrow">Workforce Operations</span>
-          <h1 className="hero-title">Biometric Attendance Overview</h1>
+          <h1 className="hero-title">Attendance Overview</h1>
         </div>
         <div className="hero-meta">
           <span className="meta-pill">{location === 'All' ? 'Dubai & India' : location}</span>
-          <span className="meta-pill meta-date">{formatDateRange(startDate, endDate)}</span>
+          <span className="meta-pill meta-date">{formatTableDateRange(startDate, endDate)}</span>
         </div>
       </section>
 
@@ -518,36 +557,52 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location,
       {isLoading ? <SummaryCardsSkeleton /> : <SummaryCards summary={report.summary} />}
 
       <section className="flagged-card">
-        <div className="section-title"><h2>Flagged staff</h2><div className="section-actions"><span className="scope-note">Biometric attendance only</span><button className="reset-button" type="button" onClick={() => downloadAttendanceExcel(visibleRows, `attendance-${startDate || 'latest'}-to-${endDate || startDate || 'latest'}-page-${pagination.page}`)} disabled={state !== 'ready' || visibleRows.length === 0}>Export Excel</button></div></div>
+        <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead><tbody>
-          {isLoading && <TableRowsSkeleton rows={6} showEmployee />}
-          {state === 'error' && <tr><td colSpan="6" className="table-message error-message">{error}</td></tr>}
+        <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead><tbody>
+          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate />}
+          {state === 'error' && <tr><td colSpan="7" className="table-message error-message">{error}</td></tr>}
           {state === 'ready' && visibleRows.map((row) => <tr key={`${row.userId}-${row.firstIn}`}>
             <td><button className="employee-cell employee-button" type="button" onClick={() => onSelectUser(row.userId)}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
+            <td className="num-cell">{formatTableDateRange(startDate, endDate)}</td>
             <td><span className="location-tag">{row.location}</span></td>
             <td className="num-cell">{formatTime(row.firstIn)}</td>
-            <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">In office</span>}</td>
+            <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">Not logged out</span>}</td>
             <td className="num-cell">{row.recordedTime}</td>
             <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
           </tr>)}
-          {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan="6" className="table-message">No flagged biometric attendance for this selection.</td></tr>}
+          {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan="7" className="table-message">No flagged attendance for this selection.</td></tr>}
         </tbody></table></div>
-        <footer className="table-footer">{isLoading ? <span>Loading biometric attendance records…</span> : <><span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
+        <footer className="table-footer">{isLoading ? <span>Loading attendance records…</span> : <><span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
       </section>
     </>
   );
 }
 
-function HistoryCharts({ rows }) {
-  const chartData = buildHistoryChartData(rows);
-  const maxMinutes = Math.max(480, ...chartData.map((item) => item.minutes), 1);
-  const statusTotal = chartData.length || 1;
-  const metrics = [
-    { label: 'Late arrivals', value: chartData.filter((item) => item.late).length, color: '#e94b2e' },
-    { label: 'Early checkouts', value: chartData.filter((item) => item.early).length, color: '#e67e22' },
-    { label: 'Under 8 hours', value: chartData.filter((item) => item.underEight).length, color: '#fb3b5e' },
-  ];
+const HistoryCharts = memo(function HistoryCharts({ rows }) {
+  const { chartData, maxMinutes, statusTotal, metrics } = useMemo(() => {
+    const data = buildHistoryChartData(rows);
+    let lateCount = 0;
+    let earlyCount = 0;
+    let underEightCount = 0;
+    let maxMins = 480;
+    for (const item of data) {
+      if (item.minutes > maxMins) maxMins = item.minutes;
+      if (item.late) lateCount += 1;
+      if (item.early) earlyCount += 1;
+      if (item.underEight) underEightCount += 1;
+    }
+    return {
+      chartData: data,
+      maxMinutes: Math.max(maxMins, 1),
+      statusTotal: data.length || 1,
+      metrics: [
+        { label: 'Late arrivals', value: lateCount, color: '#e94b2e' },
+        { label: 'Early checkouts', value: earlyCount, color: '#e67e22' },
+        { label: 'Under 8 hours', value: underEightCount, color: '#fb3b5e' },
+      ],
+    };
+  }, [rows]);
 
   return (
     <div className="charts-grid">
@@ -578,27 +633,29 @@ function HistoryCharts({ rows }) {
       </article>
     </div>
   );
-}
+});
 
-function AttendanceCalendar({ rows, month, setMonth }) {
-  const weeks = buildCalendarWeeks(rows, month);
-  const monthLabel = new Intl.DateTimeFormat('en', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(`${month}-01T00:00:00Z`));
-  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const AttendanceCalendar = memo(function AttendanceCalendar({ rows, month, setMonth }) {
+  const cells = useMemo(() => buildCalendarWeeks(rows, month).flat(), [rows, month]);
+  const monthLabel = useMemo(
+    () => MONTH_FORMATTER.format(new Date(`${month}-01T00:00:00Z`)),
+    [month],
+  );
 
   return (
     <section className="calendar-card" aria-label="Monthly attendance calendar">
       <div className="calendar-heading">
-        <div><h3>{monthLabel}</h3><span>Biometric attendance by day</span></div>
+        <div><h3>{monthLabel}</h3><span>Attendance by day</span></div>
         <label><span>Month</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label>
       </div>
-      <div className="calendar-grid calendar-weekdays">{dayNames.map((day) => <span key={day}>{day}</span>)}</div>
-      <div className="calendar-grid calendar-days">{weeks.flat().map((cell, index) => <div className={cell.date ? `calendar-day ${cell.row ? 'has-attendance' : ''}` : 'calendar-day empty'} key={cell.date || `empty-${index}`}>
+      <div className="calendar-grid calendar-weekdays">{DAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
+      <div className="calendar-grid calendar-days">{cells.map((cell, index) => <div className={cell.date ? `calendar-day ${cell.row ? 'has-attendance' : ''}` : 'calendar-day empty'} key={cell.date || `empty-${index}`}>
         {cell.date && <><b>{Number(cell.date.slice(-2))}</b>{cell.row && <><span className={cell.row.status.length ? 'calendar-dot flagged' : 'calendar-dot'} /><small>{cell.row.lastOut ? formatTime(cell.row.firstIn) : 'In office'}</small></>}</>}
       </div>)}</div>
       <div className="calendar-legend"><span><i className="calendar-dot" />Recorded attendance</span><span><i className="calendar-dot flagged" />Flagged attendance</span></div>
     </section>
   );
-}
+});
 
 function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelectedUserId, historyFrom, setHistoryFrom, historyTo, setHistoryTo, loadUserHistory, history, historyState, historyError, calendarMonth, setCalendarMonth }) {
   const isHistoryLoading = historyState === 'loading';
@@ -610,18 +667,15 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
           <span className="hero-eyebrow">Individual History</span>
           <h1 className="hero-title">Employee Attendance Report</h1>
         </div>
-        <div className="hero-meta">
-          <span className="meta-pill">Read-only history</span>
-        </div>
       </section>
 
       <section className="history-card user-report-page">
         <div className="section-title">
           <div>
             <h2>User report</h2>
-            <p className="page-subtitle">Review biometric attendance for one employee across selected dates.</p>
+            <p className="page-subtitle">Review attendance for one employee across selected dates.</p>
           </div>
-          <div className="section-actions"><span className="scope-note">COSEC biometric feed</span><button className="reset-button" type="button" onClick={() => downloadAttendanceExcel(history?.rows || [], `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !history?.rows.length}>Export Excel</button></div>
+          <div className="section-actions"><button className="reset-button" type="button" onClick={() => exportAttendanceExcel(history?.rows || [], `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !history?.rows.length}>Export Excel</button></div>
         </div>
         <div className="history-controls">
           <div className="control-field employee-combobox-field">
@@ -681,7 +735,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                       <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
                     </tr>
                   ))}
-                  {history.rows.length === 0 && <tr><td colSpan="6" className="table-message">No biometric history for this employee and date range.</td></tr>}
+                  {history.rows.length === 0 && <tr><td colSpan="6" className="table-message">No attendance history for this employee and date range.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -699,12 +753,15 @@ function App() {
   const [endDate, setEndDate] = useState('');
   const [location, setLocation] = useState('All');
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [tab, setTab] = useState('all');
   const [report, setReport] = useState({ rows: [], summary: { late: 0, early: 0, underEight: 0 } });
   const [pageNumber, setPageNumber] = useState(1);
   const [pagination, setPagination] = useState({ page: 1, pageSize: 10, total: 0, totalPages: 1 });
   const [state, setState] = useState('loading');
   const [error, setError] = useState('');
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
   const [historyFrom, setHistoryFrom] = useState('');
   const [historyTo, setHistoryTo] = useState('');
@@ -712,8 +769,13 @@ function App() {
   const [historyState, setHistoryState] = useState('idle');
   const [historyError, setHistoryError] = useState('');
   const [users, setUsers] = useState([]);
-  const [usersLoading, setUsersLoading] = useState(true);
+  const [usersLoading, setUsersLoading] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState('');
+
+  const usersLoadedRef = useRef(false);
+  const lastAttendanceKeyRef = useRef('');
+  const attendanceCacheRef = useRef(new Map());
+  const historyAbortRef = useRef(null);
 
   useEffect(() => {
     const onHashChange = () => setPage(window.location.hash === '#user-report' ? 'user-report' : 'dashboard');
@@ -721,57 +783,199 @@ function App() {
     return () => window.removeEventListener('hashchange', onHashChange);
   }, []);
 
+  // Debounce employee search input to avoid firing an API call on every keystroke
   useEffect(() => {
-    fetch('/api/attendance/users')
-      .then((response) => { if (!response.ok) throw new Error('Unable to load employees'); return response.json(); })
-      .then((result) => setUsers(result.users || []))
-      .catch(() => setUsers([]))
-      .finally(() => setUsersLoading(false));
+    const timer = window.setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  // Lazy-load /api/attendance/users only when User Reports is opened, with AbortController
+  useEffect(() => {
+    if (page !== 'user-report' || usersLoadedRef.current) return undefined;
+
+    const controller = new AbortController();
+    setUsersLoading(true);
+
+    fetch('/api/attendance/users', { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load employees');
+        return response.json();
+      })
+      .then((result) => {
+        setUsers(result.users || []);
+        usersLoadedRef.current = true;
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setUsers([]);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setUsersLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [page]);
+
+  // Abort any in-flight user history request when leaving User Reports or unmounting
+  useEffect(() => {
+    if (page !== 'user-report' && historyAbortRef.current) {
+      historyAbortRef.current.abort();
+      historyAbortRef.current = null;
+    }
+  }, [page]);
+
+  useEffect(() => () => {
+    historyAbortRef.current?.abort();
   }, []);
 
   useEffect(() => {
     setPageNumber(1);
-  }, [startDate, endDate, location, search, tab]);
+  }, [startDate, endDate, location, debouncedSearch, tab]);
 
+  // Lazy-load /api/attendance only when Dashboard is active, with client-side TTL cache & AbortController
   useEffect(() => {
+    if (page !== 'dashboard') return undefined;
+
+    const params = buildAttendanceParams({
+      pageNumber,
+      location,
+      search: debouncedSearch,
+      tab,
+      startDate,
+      endDate,
+    });
+    const queryKey = params.toString();
+    if (queryKey === lastAttendanceKeyRef.current) return undefined;
+
+    const cachedReport = getCachedEntry(attendanceCacheRef.current, queryKey);
+    if (cachedReport) {
+      lastAttendanceKeyRef.current = queryKey;
+      setReport(cachedReport);
+      setPagination(cachedReport.pagination || { page: pageNumber, pageSize: 10, total: cachedReport.rows.length, totalPages: 1 });
+      setError('');
+      setState('ready');
+      return undefined;
+    }
+
     const controller = new AbortController();
     setState('loading');
     setError('');
-    const params = new URLSearchParams({ page: String(pageNumber), pageSize: '10', location, search, tab });
-    if (startDate) params.set('startDate', startDate);
-    if (endDate) params.set('endDate', endDate);
-    const endpoint = `/api/attendance?${params.toString()}`;
-    fetch(endpoint, { signal: controller.signal }).then((response) => { if (!response.ok) throw new Error('Unable to load attendance'); return response.json(); }).then((nextReport) => {
-      if (!startDate && nextReport.startDate) setStartDate(nextReport.startDate);
-      if (!endDate && nextReport.endDate) setEndDate(nextReport.endDate);
-      if (!historyFrom && nextReport.startDate) setHistoryFrom(nextReport.startDate);
-      if (!historyTo && nextReport.endDate) setHistoryTo(nextReport.endDate);
-      if (!calendarMonth && nextReport.endDate) setCalendarMonth(nextReport.endDate.slice(0, 7));
-      setReport(nextReport);
-      setPagination(nextReport.pagination || { page: pageNumber, pageSize: 10, total: nextReport.rows.length, totalPages: 1 });
-      setState('ready');
-    }).catch((requestError) => { if (requestError.name !== 'AbortError') { setError(requestError.message); setState('error'); } });
+
+    fetch(`/api/attendance?${queryKey}`, { signal: controller.signal })
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load attendance');
+        return response.json();
+      })
+      .then((nextReport) => {
+        const resolvedStart = startDate || nextReport.startDate || '';
+        const resolvedEnd = endDate || nextReport.endDate || '';
+        const resolvedKey = buildAttendanceParams({
+          pageNumber,
+          location,
+          search: debouncedSearch,
+          tab,
+          startDate: resolvedStart,
+          endDate: resolvedEnd,
+        }).toString();
+
+        lastAttendanceKeyRef.current = resolvedKey;
+        setCachedEntry(attendanceCacheRef.current, resolvedKey, nextReport);
+
+        if (!startDate && nextReport.startDate) setStartDate(nextReport.startDate);
+        if (!endDate && nextReport.endDate) setEndDate(nextReport.endDate);
+        if (!historyFrom && nextReport.startDate) setHistoryFrom(nextReport.startDate);
+        if (!historyTo && nextReport.endDate) setHistoryTo(nextReport.endDate);
+        if (!calendarMonth && nextReport.endDate) setCalendarMonth(nextReport.endDate.slice(0, 7));
+        setReport(nextReport);
+        setPagination(nextReport.pagination || { page: pageNumber, pageSize: 10, total: nextReport.rows.length, totalPages: 1 });
+        setState('ready');
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setError(requestError.message);
+          setState('error');
+        }
+      });
+
     return () => controller.abort();
-  }, [startDate, endDate, location, pageNumber, search, tab]);
+  }, [page, startDate, endDate, location, pageNumber, debouncedSearch, tab]);
 
   const userOptions = useMemo(() => [...(users.length ? users : report.rows)].sort((a, b) => a.employee.localeCompare(b.employee)), [report.rows, users]);
 
-  function openUserReport(userId) {
+  const openUserReport = useCallback((userId) => {
     setSelectedUserId(userId);
     setCalendarMonth((historyTo || endDate || startDate || '2026-01').slice(0, 7));
     window.location.hash = 'user-report';
-  }
+  }, [historyTo, endDate, startDate]);
 
-  function resetFilters() {
-    setStartDate(''); setEndDate(''); setLocation('All'); setSearch(''); setTab('all'); setPageNumber(1);
-  }
+  const resetFilters = useCallback(() => {
+    lastAttendanceKeyRef.current = '';
+    attendanceCacheRef.current.clear();
+    setStartDate('');
+    setEndDate('');
+    setLocation('All');
+    setSearch('');
+    setDebouncedSearch('');
+    setTab('all');
+    setPageNumber(1);
+  }, []);
 
-  function loadUserHistory() {
+  const loadUserHistory = useCallback(() => {
     if (!selectedUserId || !historyFrom || !historyTo) return;
+    historyAbortRef.current?.abort();
+    const controller = new AbortController();
+    historyAbortRef.current = controller;
+
     setCalendarMonth(historyTo.slice(0, 7));
-    setHistoryState('loading'); setHistoryError('');
-    fetch(`/api/attendance/history?userId=${encodeURIComponent(selectedUserId)}&from=${encodeURIComponent(historyFrom)}&to=${encodeURIComponent(historyTo)}`).then((response) => { if (!response.ok) throw new Error('Unable to load user history'); return response.json(); }).then((nextHistory) => { setHistory(nextHistory); setHistoryState('ready'); }).catch((requestError) => { setHistoryError(requestError.message); setHistoryState('error'); });
-  }
+    setHistoryState('loading');
+    setHistoryError('');
+
+    fetch(
+      `/api/attendance/history?userId=${encodeURIComponent(selectedUserId)}&from=${encodeURIComponent(historyFrom)}&to=${encodeURIComponent(historyTo)}`,
+      { signal: controller.signal },
+    )
+      .then((response) => {
+        if (!response.ok) throw new Error('Unable to load user history');
+        return response.json();
+      })
+      .then((nextHistory) => {
+        setHistory(nextHistory);
+        setHistoryState('ready');
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setHistoryError(requestError.message);
+          setHistoryState('error');
+        }
+      })
+      .finally(() => {
+        if (historyAbortRef.current === controller) {
+          historyAbortRef.current = null;
+        }
+      });
+  }, [selectedUserId, historyFrom, historyTo]);
+
+  const exportOverview = useCallback(async () => {
+    setIsExporting(true);
+    setExportError('');
+    try {
+      const rows = await fetchAllAttendanceRows(fetch, {
+        startDate,
+        endDate,
+        location,
+        search: debouncedSearch,
+        tab,
+      });
+      await exportAttendanceExcel(rows, `attendance-${startDate || 'latest'}-to-${endDate || startDate || 'latest'}`);
+    } catch (exportRequestError) {
+      setExportError(exportRequestError.message || 'Unable to export attendance');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [debouncedSearch, endDate, location, startDate, tab]);
 
   return (
     <div className="app-layout">
@@ -796,6 +1000,9 @@ function App() {
             resetFilters={resetFilters}
             pagination={pagination}
             setPage={setPageNumber}
+            onExport={exportOverview}
+            isExporting={isExporting}
+            exportError={exportError}
           />
         ) : (
           <UserReportPage
@@ -818,7 +1025,7 @@ function App() {
       </main>
       <footer className="site-footer">
         <span>techcarrot · Digital Transformation Partner</span>
-        <span>Biometric Attendance Portal</span>
+        <span>Attendance Portal</span>
       </footer>
     </div>
   );
