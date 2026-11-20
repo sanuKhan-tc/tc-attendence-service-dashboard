@@ -14,7 +14,13 @@ test('builds a read-only biometric attendance query for the hard-coded devices',
   assert.match(normalized, /@ENDDATE/);
   assert.match(normalized, /OFFSET @PAGEOFFSET ROWS FETCH NEXT @PAGESIZE ROWS ONLY/);
   assert.match(normalized, /COUNT\(\*\) OVER\(\)/);
-  assert.match(normalized, /R\.LATE = 1 OR R\.EARLY = 1 OR R\.UNDEREIGHT = 1/);
+  assert.match(normalized, /SUM\(CASE WHEN G\.LATECOUNT > 0 THEN 1 ELSE 0 END\) OVER\(\) AS TOTALLATE/);
+  assert.match(normalized, /GROUP BY R\.USERID/);
+  assert.match(normalized, /G\.LATECOUNT > 0 OR G\.EARLYCOUNT > 0 OR G\.UNDEREIGHTCOUNT > 0/);
+  assert.match(normalized, /ORDER BY G\.LATECOUNT DESC, G\.EARLYCOUNT DESC/);
+  assert.match(normalized, /@LOCATION = N'INDIA' AND R\.LOCATION LIKE N'INDIA%'/);
+  assert.match(normalized, /CONVERT\(TIME, PUNCHES\.FIRSTIN\) > M\.LATECUTOFF/);
+  assert.match(normalized, /CONVERT\(TIME, PUNCHES\.LASTEVENT\) < M\.OFFICEEND/);
   for (const device of BIOMETRIC_DEVICES) assert.match(normalized, new RegExp(`\\(${device.mid},`));
   assert.doesNotMatch(normalized, /\b(INSERT|UPDATE|DELETE|MERGE|ALTER|DROP|TRUNCATE)\b/);
 });

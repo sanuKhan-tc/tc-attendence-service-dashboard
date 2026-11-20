@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
-  { userId: 'EMP-2', employee: 'Omar Hassan', location: 'India', firstIn: '2026-11-19T09:30:00Z', status: ['Early checkout'], late: false, early: true, underEight: false },
+  { userId: 'EMP-2', employee: 'Omar Hassan', location: 'India - Hyderabad', firstIn: '2026-11-19T09:30:00Z', status: ['Early checkout'], late: false, early: true, underEight: false },
+  { userId: 'EMP-3', employee: 'Priya Nair', location: 'India - Chennai', firstIn: '2026-11-19T09:35:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
 ];
 
 test('formats SQL wall-clock timestamps as local display time', () => {
@@ -13,9 +14,23 @@ test('formats SQL wall-clock timestamps as local display time', () => {
 });
 
 test('filters by location, employee search, and report tab', () => {
-  assert.deepEqual(filterAttendanceRows(rows, { location: 'India', search: '', tab: 'all' }).map((row) => row.userId), ['EMP-2']);
+  assert.deepEqual(filterAttendanceRows(rows, { location: 'India', search: '', tab: 'all' }).map((row) => row.userId), ['EMP-2', 'EMP-3']);
+  assert.deepEqual(filterAttendanceRows(rows, { location: 'India - Hyderabad', search: '', tab: 'all' }).map((row) => row.userId), ['EMP-2']);
   assert.deepEqual(filterAttendanceRows(rows, { location: 'All', search: 'aisha', tab: 'all' }).map((row) => row.userId), ['EMP-1']);
   assert.deepEqual(filterAttendanceRows(rows, { location: 'All', search: '', tab: 'early' }).map((row) => row.userId), ['EMP-2']);
+});
+
+test('paginates user report rows and clamps out-of-range pages', () => {
+  const sample = Array.from({ length: 23 }, (_, index) => ({ id: index + 1 }));
+  const page2 = paginateRows(sample, 2, 10);
+  const clamped = paginateRows(sample, 99, 10);
+
+  assert.equal(page2.page, 2);
+  assert.equal(page2.totalPages, 3);
+  assert.equal(page2.total, 23);
+  assert.deepEqual(page2.rows.map((item) => item.id), [11, 12, 13, 14, 15, 16, 17, 18, 19, 20]);
+  assert.equal(clamped.page, 3);
+  assert.deepEqual(clamped.rows.map((item) => item.id), [21, 22, 23]);
 });
 
 test('builds compact chart data from user history rows', () => {

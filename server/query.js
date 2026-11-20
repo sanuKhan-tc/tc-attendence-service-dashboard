@@ -1,6 +1,7 @@
 function deviceMapSql(devices) {
   return devices
-    .map(({ mid, location }) => `(${mid}, N'${location.replaceAll("'", "''")}')`)
+    .map(({ mid, location, lateCutoff, officeEnd }) =>
+      `(${mid}, N'${location.replaceAll("'", "''")}', CONVERT(time, N'${lateCutoff}:00'), CONVERT(time, N'${officeEnd}:00'))`)
     .join(',\n    ');
 }
 
@@ -16,28 +17,60 @@ function buildScopedAttendanceQuery(devices, dateFilter, userFilter = '', { pagi
   const mids = devices.map(({ mid }) => mid).join(', ');
   const punchValues = punchValuesSql();
   const deviceFilter = devicePresenceFilterSql(mids);
-  const pageFields = paginated ? `,
+
+  const finalSelect = paginated ? `, GroupedRows AS (
+  SELECT
+    r.userId,
+    MAX(r.employee) AS employee,
+    MAX(r.location) AS location,
+    MIN(r.firstIn) AS firstIn,
+    MAX(r.lastEvent) AS lastEvent,
+    SUM(r.late) AS lateCount,
+    SUM(r.early) AS earlyCount,
+    SUM(r.underEight) AS underEightCount
+  FROM ResolvedRows AS r
+  WHERE (@location = N'All' OR r.location = @location OR (@location = N'India' AND r.location LIKE N'India%'))
+    AND (@search = N'' OR r.employee LIKE N'%' + @search + N'%' OR r.userId LIKE N'%' + @search + N'%')
+  GROUP BY r.userId
+)
+SELECT
+  g.userId,
+  g.employee,
+  g.location,
+  g.firstIn,
+  g.lastEvent,
+  g.lateCount,
+  g.earlyCount,
+  g.underEightCount,
   COUNT(*) OVER() AS totalCount,
-  SUM(r.late) OVER() AS totalLate,
-  SUM(r.early) OVER() AS totalEarly,
-  SUM(r.underEight) OVER() AS totalUnderEight` : '';
-  const pageFilter = paginated ? `
-WHERE (@location = N'All' OR r.location = @location)
-  AND (@search = N'' OR r.employee LIKE N'%' + @search + N'%' OR r.userId LIKE N'%' + @search + N'%')
-  AND (
-    (@tab = N'all' AND (r.late = 1 OR r.early = 1 OR r.underEight = 1))
-    OR (@tab = N'late' AND r.late = 1)
-    OR (@tab = N'early' AND r.early = 1)
-    OR (@tab = N'underEight' AND r.underEight = 1)
-  )` : '';
-  const pageClause = paginated ? 'OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY' : '';
-  const queryOption = paginated ? '\nOPTION (RECOMPILE)' : '';
+  SUM(CASE WHEN g.lateCount > 0 THEN 1 ELSE 0 END) OVER() AS totalLate,
+  SUM(CASE WHEN g.earlyCount > 0 THEN 1 ELSE 0 END) OVER() AS totalEarly,
+  SUM(CASE WHEN g.underEightCount > 0 THEN 1 ELSE 0 END) OVER() AS totalUnderEight
+FROM GroupedRows AS g
+WHERE (
+  (@tab = N'all' AND (g.lateCount > 0 OR g.earlyCount > 0 OR g.underEightCount > 0))
+  OR (@tab = N'late' AND g.lateCount > 0)
+  OR (@tab = N'early' AND g.earlyCount > 0)
+  OR (@tab = N'underEight' AND g.underEightCount > 0)
+)
+ORDER BY g.lateCount DESC, g.earlyCount DESC, g.employee, g.userId
+OFFSET @pageOffset ROWS FETCH NEXT @pageSize ROWS ONLY
+OPTION (RECOMPILE);` : `
+SELECT
+  r.userId,
+  r.employee,
+  r.location,
+  r.firstIn,
+  r.lastEvent,
+  r.workTime
+FROM ResolvedRows AS r
+ORDER BY r.firstIn, r.userId;`;
 
   return `
-WITH DeviceMap (MID, Location) AS (
+WITH DeviceMap (MID, Location, LateCutoff, OfficeEnd) AS (
   SELECT * FROM (VALUES
     ${deviceMapSql(devices)}
-  ) AS Devices(MID, Location)
+  ) AS Devices(MID, Location, LateCutoff, OfficeEnd)
 ), AttendanceRows AS (
   SELECT
     a.UserID,
@@ -67,8 +100,8 @@ WITH DeviceMap (MID, Location) AS (
     punches.FirstIn AS firstIn,
     CASE WHEN punches.EventCount > 1 THEN punches.LastEvent END AS lastEvent,
     a.WorkTime AS workTime,
-    CASE WHEN CONVERT(time, punches.FirstIn) > CONVERT(time, CASE WHEN m.Location = N'Dubai' THEN N'08:30:00' ELSE N'09:30:00' END) THEN 1 ELSE 0 END AS late,
-    CASE WHEN punches.EventCount > 1 AND CONVERT(time, punches.LastEvent) < CONVERT(time, CASE WHEN m.Location = N'Dubai' THEN N'17:00:00' ELSE N'18:00:00' END) THEN 1 ELSE 0 END AS early,
+    CASE WHEN CONVERT(time, punches.FirstIn) > m.LateCutoff THEN 1 ELSE 0 END AS late,
+    CASE WHEN punches.EventCount > 1 AND CONVERT(time, punches.LastEvent) < m.OfficeEnd THEN 1 ELSE 0 END AS early,
     CASE WHEN punches.EventCount > 1 AND COALESCE(a.WorkTime, DATEDIFF(minute, punches.FirstIn, punches.LastEvent)) < 480 THEN 1 ELSE 0 END AS underEight
   FROM AttendanceRows AS a
   CROSS APPLY (
@@ -92,18 +125,7 @@ ${punchValues}
   INNER JOIN DeviceMap AS m ON m.MID = punches.FirstMID
   LEFT JOIN dbo.Mx_UserMst AS u ON u.UserID = a.UserID
   WHERE punches.FirstIn IS NOT NULL
-)
-SELECT
-  r.userId,
-  r.employee,
-  r.location,
-  r.firstIn,
-  r.lastEvent,
-  r.workTime${pageFields}
-FROM ResolvedRows AS r
-${pageFilter}
-ORDER BY r.firstIn, r.userId
-${pageClause}${queryOption};`;
+)${finalSelect}`;
 }
 
 export function buildAttendanceQuery(devices) {

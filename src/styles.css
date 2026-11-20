@@ -639,12 +639,14 @@ tbody tr:hover {
 
 .error-message { color: #c72446; font-weight: 600; }
 
-.flagged-card footer {
+.flagged-card footer,
+.history-card footer {
   border-top: 1px solid #eef0f5;
   color: var(--tc-text-muted);
   padding: 13px 22px;
   font-size: 12px;
   background: var(--tc-surface-muted);
+  border-radius: 0 0 16px 16px;
 }
 
 .table-footer {
@@ -1167,10 +1169,12 @@ tbody tr:hover {
   grid-template-columns: 1.4fr 1fr;
   gap: 18px;
   margin: 0 22px 22px;
+  min-width: 0;
 }
 
 .chart-card {
   min-height: 235px;
+  min-width: 0;
   padding: 18px 20px;
   border: 1px solid var(--tc-border);
   border-radius: 0 18px 0 18px;
@@ -1208,6 +1212,7 @@ tbody tr:hover {
 }
 
 .bar-column {
+  flex: 0 0 26px;
   min-width: 26px;
   height: 100%;
   display: flex;
@@ -1310,6 +1315,14 @@ tbody tr:hover {
   color: var(--tc-indigo);
   font-variant-numeric: tabular-nums;
   font-weight: 800;
+  text-decoration: none;
+  transition: color 0.16s ease;
+}
+
+.footer-version:hover,
+.footer-version.active {
+  color: var(--tc-coral);
+  text-decoration: underline;
 }
 
 @media (max-width: 900px) {

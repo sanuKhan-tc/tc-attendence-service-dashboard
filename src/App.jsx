@@ -7,12 +7,13 @@ import {
   filterEmployeeOptions,
   formatTableDateRange,
   formatTime,
+  paginateRows,
   presentDaysLabel,
 } from './attendanceUi.js';
 import { fetchAllAttendanceRows } from './attendanceExport.js';
 import versionInfo from '../version.json';
 
-const LOCATIONS = ['All', 'Dubai', 'India'];
+const LOCATIONS = ['All', 'Dubai', 'India', 'India - Hyderabad', 'India - Noida', 'India - Chennai', 'India - Cafeteria'];
 const TABS = [
   { id: 'all', label: 'All flagged' },
   { id: 'late', label: 'Late arrivals' },
@@ -61,17 +62,24 @@ function buildAttendanceParams({ pageNumber, location, search, tab, startDate, e
   return params;
 }
 
-async function exportAttendanceExcel(rows, filename) {
+async function exportAttendanceExcel(rows, filename, options) {
   const { downloadAttendanceExcel } = await import('./excelExport.js');
-  downloadAttendanceExcel(rows, filename);
+  downloadAttendanceExcel(rows, filename, options);
 }
 
 function initials(name) {
   return name.split(/\s+/).slice(0, 2).map((part) => part[0]).join('').toUpperCase();
 }
 
-function statusLabel(status) {
-  return status === 'Early checkout' ? 'Early checkout · provisional' : status;
+function statusLabel(status, row = null, showCount = false) {
+  const base = status === 'Early checkout' ? 'Early checkout · provisional' : status;
+  if (!showCount || !row) return base;
+  const count = status === 'Late arrival'
+    ? row.lateCount
+    : status === 'Early checkout'
+      ? row.earlyCount
+      : row.underEightCount;
+  return count ? `${base} (${count})` : base;
 }
 
 function statusClassName(status) {
@@ -181,7 +189,6 @@ const Navigation = memo(function Navigation({ page, dataSource }) {
         <div className="nav-links">
           <a className={page === 'dashboard' ? 'nav-link active' : 'nav-link'} href="#dashboard">Overview</a>
           <a className={page === 'user-report' ? 'nav-link active' : 'nav-link'} href="#user-report">User reports</a>
-          <a className={page === 'changelog' ? 'nav-link active' : 'nav-link'} href="#changelog">Changelog</a>
         </div>
         <span className="nav-scope">
           <span className="status-dot" aria-hidden="true" />
@@ -209,7 +216,7 @@ function SummaryCardsSkeleton() {
   );
 }
 
-function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false }) {
+function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true }) {
   return Array.from({ length: rows }, (_, index) => (
     <tr className="skeleton-row" key={index} aria-hidden="true">
       <td>
@@ -227,9 +234,13 @@ function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false }) 
       </td>
       {showDate && <td><span className="skeleton skeleton-line w-64" /></td>}
       <td><span className="skeleton skeleton-pill w-64" /></td>
-      <td><span className="skeleton skeleton-line w-56" /></td>
-      <td><span className="skeleton skeleton-line w-56" /></td>
-      <td><span className="skeleton skeleton-line w-64" /></td>
+      {showTimes && (
+        <>
+          <td><span className="skeleton skeleton-line w-56" /></td>
+          <td><span className="skeleton skeleton-line w-56" /></td>
+        </>
+      )}
+      {!showEmployee && <td><span className="skeleton skeleton-line w-64" /></td>}
       <td><span className="skeleton skeleton-pill w-110" /></td>
     </tr>
   ));
@@ -286,7 +297,7 @@ const SummaryCards = memo(function SummaryCards({ summary, presentDaysRows }) {
           <span>Late arrivals</span>
         </div>
         <strong>{summary.late}</strong>
-        <small>Dubai after 08:30 · India after 09:30</small>
+        <small>Dubai after 08:30 · India after 10:00 · Chennai after 10:30</small>
       </article>
       <article className="summary-card early-card">
         <div className="summary-heading">
@@ -294,7 +305,7 @@ const SummaryCards = memo(function SummaryCards({ summary, presentDaysRows }) {
           <span>Early leavers</span>
         </div>
         <strong>{summary.early}</strong>
-        <small>Dubai before 17:00 · India before 18:00</small>
+        <small>Dubai before 17:00 · India before 18:30 · Chennai before 19:00</small>
       </article>
       <article className="summary-card hours-card">
         <div className="summary-heading">
@@ -511,6 +522,8 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
 
 function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError }) {
   const isLoading = state === 'loading';
+  const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
+  const columnCount = isDateRange ? 4 : 6;
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
     return filterAttendanceRows(flaggedRows, { location, search, tab });
@@ -568,19 +581,22 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location,
       <section className="flagged-card">
         <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead><tbody>
-          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate />}
-          {state === 'error' && <tr><td colSpan="7" className="table-message error-message">{error}</td></tr>}
-          {state === 'ready' && visibleRows.map((row) => <tr key={`${row.userId}-${row.firstIn}`}>
+        <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th></>}<th>Status</th></tr></thead><tbody>
+          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} />}
+          {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
+          {state === 'ready' && visibleRows.map((row) => <tr key={row.userId}>
             <td><button className="employee-cell employee-button" type="button" onClick={() => onSelectUser(row.userId)}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
             <td className="num-cell">{formatTableDateRange(startDate, endDate)}</td>
             <td><span className="location-tag">{row.location}</span></td>
-            <td className="num-cell">{formatTime(row.firstIn)}</td>
-            <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">Not logged out</span>}</td>
-            <td className="num-cell">{row.recordedTime}</td>
-            <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
+            {!isDateRange && (
+              <>
+                <td className="num-cell">{formatTime(row.firstIn)}</td>
+                <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">Not logged out</span>}</td>
+              </>
+            )}
+            <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, isDateRange)}</span>)}</div></td>
           </tr>)}
-          {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan="7" className="table-message">No flagged attendance for this selection.</td></tr>}
+          {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan={columnCount} className="table-message">No flagged attendance for this selection.</td></tr>}
         </tbody></table></div>
         <footer className="table-footer">{isLoading ? <span>Loading attendance records…</span> : <><span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
       </section>
@@ -668,6 +684,16 @@ const AttendanceCalendar = memo(function AttendanceCalendar({ rows, month, setMo
 
 function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelectedUserId, historyFrom, setHistoryFrom, historyTo, setHistoryTo, loadUserHistory, history, historyState, historyError, calendarMonth, setCalendarMonth }) {
   const isHistoryLoading = historyState === 'loading';
+  const [historyPage, setHistoryPage] = useState(1);
+
+  useEffect(() => {
+    setHistoryPage(1);
+  }, [history]);
+
+  const pagedHistory = useMemo(
+    () => paginateRows(history?.rows || [], historyPage, 10),
+    [history, historyPage],
+  );
 
   return (
     <>
@@ -734,7 +760,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
               <table>
                 <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
                 <tbody>
-                  {history.rows.map((row) => (
+                  {pagedHistory.rows.map((row) => (
                     <tr key={`${row.userId}-${row.date}`}>
                       <td className="num-cell">{row.date}</td>
                       <td><span className="location-tag">{row.location}</span></td>
@@ -744,11 +770,23 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                       <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
                     </tr>
                   ))}
-                  {history.rows.length === 0 && <tr><td colSpan="6" className="table-message">No attendance history for this employee and date range.</td></tr>}
+                  {pagedHistory.total === 0 && <tr><td colSpan="6" className="table-message">No attendance history for this employee and date range.</td></tr>}
                 </tbody>
               </table>
             </div>
-            <footer className="table-footer"><span>{history.rows.length ? `${presentDaysLabel(history.rows)} present days` : 'No records'}</span></footer>
+            <footer className="table-footer">
+              <span>
+                {pagedHistory.total
+                  ? `Showing ${pagedHistory.rows.length} of ${pagedHistory.total} records (${presentDaysLabel(history.rows)} present days) · Page ${pagedHistory.page} of ${pagedHistory.totalPages}`
+                  : 'No records'}
+              </span>
+              {pagedHistory.total > 0 && (
+                <span className="pagination-controls">
+                  <button type="button" onClick={() => setHistoryPage((current) => Math.max(1, current - 1))} disabled={pagedHistory.page <= 1}>Previous</button>
+                  <button type="button" onClick={() => setHistoryPage((current) => Math.min(pagedHistory.totalPages, current + 1))} disabled={pagedHistory.page >= pagedHistory.totalPages}>Next</button>
+                </span>
+              )}
+            </footer>
           </>
         )}
       </section>
@@ -1023,7 +1061,8 @@ function App() {
         search: debouncedSearch,
         tab,
       });
-      await exportAttendanceExcel(rows, `attendance-${startDate || 'latest'}-to-${endDate || startDate || 'latest'}`);
+      const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
+      await exportAttendanceExcel(rows, `attendance-${startDate || 'latest'}-to-${endDate || startDate || 'latest'}`, { isDateRange });
     } catch (exportRequestError) {
       setExportError(exportRequestError.message || 'Unable to export attendance');
     } finally {
@@ -1079,7 +1118,13 @@ function App() {
       </main>
       <footer className="site-footer">
         <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
-        <span className="footer-version">v{APP_VERSION}</span>
+        <a
+          className={page === 'changelog' ? 'footer-version active' : 'footer-version'}
+          href="#changelog"
+          title="View changelog"
+        >
+          v{APP_VERSION}
+        </a>
       </footer>
     </div>
   );

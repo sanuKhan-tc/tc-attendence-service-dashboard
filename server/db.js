@@ -121,7 +121,7 @@ export async function fetchAttendanceRows(
         .input('endDate', sql.Date, endDate)
         .input('pageOffset', sql.Int, (page - 1) * pageSize)
         .input('pageSize', sql.Int, pageSize)
-        .input('location', sql.NVarChar(20), location)
+        .input('location', sql.NVarChar(50), location)
         .input('search', sql.NVarChar(100), search)
         .input('tab', sql.NVarChar(20), tab);
     },

@@ -34,7 +34,9 @@ export function filterAttendanceRows(rows, { location, search, tab }) {
   const query = search.trim().toLowerCase();
 
   return rows.filter((row) => {
-    const matchesLocation = location === 'All' || row.location === location;
+    const matchesLocation = location === 'All'
+      || row.location === location
+      || (location === 'India' && row.location?.startsWith('India'));
     const matchesSearch = !query || `${row.employee} ${row.userId}`.toLowerCase().includes(query);
     const matchesTab = tab === 'all'
       || (tab === 'late' && row.late)
@@ -43,6 +45,21 @@ export function filterAttendanceRows(rows, { location, search, tab }) {
 
     return matchesLocation && matchesSearch && matchesTab;
   });
+}
+
+export function paginateRows(rows, page, pageSize = 10) {
+  const total = rows.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const start = (currentPage - 1) * pageSize;
+
+  return {
+    rows: rows.slice(start, start + pageSize),
+    page: currentPage,
+    pageSize,
+    total,
+    totalPages,
+  };
 }
 
 export function buildHistoryChartData(rows) {

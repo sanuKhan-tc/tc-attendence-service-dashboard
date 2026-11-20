@@ -11,7 +11,7 @@ import {
   fetchAttendanceUsers,
   fetchLatestAttendanceDate,
 } from './db.js';
-import { toClientReport } from './attendance.js';
+import { ALLOWED_LOCATIONS, buildConsolidatedReport, toClientReport } from './attendance.js';
 
 dotenv.config();
 
@@ -56,7 +56,7 @@ async function buildAttendanceJson(startDate, endDate, { page, pageSize, locatio
     date: startDate === endDate ? startDate : null,
     startDate,
     endDate,
-    ...toClientReport(result.rows),
+    ...buildConsolidatedReport(result.rows),
     summary: result.summary,
     pagination: { page, pageSize, total: result.total, totalPages: Math.max(1, Math.ceil(result.total / pageSize)) },
   });
@@ -79,7 +79,7 @@ app.get('/api/attendance', async (request, response) => {
     const { startDate, endDate } = resolveAttendanceDateRange(requestedStartDate, requestedEndDate, fallbackDate);
     const page = boundedInteger(request.query.page, 1, 1, 100000);
     const pageSize = boundedInteger(request.query.pageSize, 10, 1, 100);
-    const location = ['All', 'Dubai', 'India'].includes(request.query.location) ? request.query.location : 'All';
+    const location = ALLOWED_LOCATIONS.includes(request.query.location) ? request.query.location : 'All';
     const tab = ['all', 'late', 'early', 'underEight'].includes(request.query.tab) ? request.query.tab : 'all';
     const search = String(request.query.search || '').trim().slice(0, 100);
     const cacheKey = `${startDate}|${endDate}|${page}|${pageSize}|${location}|${tab}|${search.toLowerCase()}`;

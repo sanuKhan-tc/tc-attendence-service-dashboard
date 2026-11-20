@@ -2,13 +2,21 @@ const MINUTES_PER_DAY = 24 * 60;
 
 export const BIOMETRIC_DEVICES = [
   { mid: 15, name: 'TA-tc Dubai-Device-1', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00' },
-  { mid: 12, name: 'TC-Hyderabad', location: 'India', lateCutoff: '09:30', officeEnd: '18:00' },
-  { mid: 13, name: 'TC-Noida', location: 'India', lateCutoff: '09:30', officeEnd: '18:00' },
-  { mid: 16, name: 'TC- Chennai', location: 'India', lateCutoff: '09:30', officeEnd: '18:00' },
-  { mid: 14, name: 'techcarrot-Cafeteria', location: 'India', lateCutoff: '09:30', officeEnd: '18:00' },
+  { mid: 12, name: 'TC-Hyderabad', location: 'India - Hyderabad', lateCutoff: '10:00', officeEnd: '18:30' },
+  { mid: 13, name: 'TC-Noida', location: 'India - Noida', lateCutoff: '10:00', officeEnd: '18:30' },
+  { mid: 16, name: 'TC- Chennai', location: 'India - Chennai', lateCutoff: '10:30', officeEnd: '19:00' },
+  { mid: 14, name: 'techcarrot-Cafeteria', location: 'India - Cafeteria', lateCutoff: '10:00', officeEnd: '18:30' },
+];
+
+export const ALLOWED_LOCATIONS = [
+  'All',
+  'Dubai',
+  'India',
+  ...new Set(BIOMETRIC_DEVICES.map((device) => device.location).filter((location) => location !== 'Dubai')),
 ];
 
 const deviceRules = new Map(BIOMETRIC_DEVICES.map((device) => [device.location, device]));
+const defaultIndiaRule = BIOMETRIC_DEVICES.find((device) => device.location.startsWith('India'));
 
 function dateValue(value) {
   if (value instanceof Date) return value;
@@ -69,7 +77,10 @@ function normalizeRows(rows) {
 
 export function buildAttendanceReport(rows) {
   const reportRows = normalizeRows(rows).map((row) => {
-    const rule = deviceRules.get(row.location) ?? BIOMETRIC_DEVICES.find((device) => device.name === row.deviceName) ?? BIOMETRIC_DEVICES[0];
+    const rule = deviceRules.get(row.location)
+      ?? BIOMETRIC_DEVICES.find((device) => device.name === row.deviceName)
+      ?? (row.location?.startsWith('India') ? defaultIndiaRule : null)
+      ?? BIOMETRIC_DEVICES[0];
     const firstIn = row.firstIn;
     const lastOut = row.lastEvent && row.lastEvent.getTime() > firstIn.getTime() ? row.lastEvent : null;
     const calculatedMinutes = lastOut ? minutesBetween(firstIn, lastOut) : null;
@@ -98,6 +109,48 @@ export function buildAttendanceReport(rows) {
       ].filter(Boolean),
     };
   }).sort((a, b) => a.firstIn.localeCompare(b.firstIn));
+
+  return {
+    rows: reportRows,
+    summary: {
+      late: reportRows.filter((row) => row.late).length,
+      early: reportRows.filter((row) => row.early).length,
+      underEight: reportRows.filter((row) => row.underEight).length,
+    },
+  };
+}
+
+export function buildConsolidatedReport(rows) {
+  const reportRows = rows.map((row) => {
+    const lateCount = Number(row.lateCount || 0);
+    const earlyCount = Number(row.earlyCount || 0);
+    const underEightCount = Number(row.underEightCount || 0);
+    const late = lateCount > 0;
+    const early = earlyCount > 0;
+    const underEight = underEightCount > 0;
+    const firstIn = row.firstIn ? dateValue(row.firstIn) : null;
+    const lastEvent = row.lastEvent ? dateValue(row.lastEvent) : null;
+    const lastOut = firstIn && lastEvent && lastEvent.getTime() > firstIn.getTime() ? lastEvent : null;
+
+    return {
+      userId: row.userId,
+      employee: row.employee || row.fullName || row.userId,
+      location: row.location,
+      firstIn: firstIn?.toISOString() ?? null,
+      lastOut: lastOut?.toISOString() ?? null,
+      lateCount,
+      earlyCount,
+      underEightCount,
+      late,
+      early,
+      underEight,
+      status: [
+        late ? 'Late arrival' : null,
+        early ? 'Early checkout' : null,
+        underEight ? 'Under 8 hours' : null,
+      ].filter(Boolean),
+    };
+  });
 
   return {
     rows: reportRows,
