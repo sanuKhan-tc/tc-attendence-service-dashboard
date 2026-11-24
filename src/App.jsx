@@ -724,13 +724,10 @@ const AttendanceCalendar = memo(function AttendanceCalendar({ rows, month, setMo
   );
 });
 
-function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelectedUserId, historyPreset, setHistoryPreset, historyFrom, setHistoryFrom, historyTo, setHistoryTo, historyLocation, setHistoryLocation, onHistoryPresetChange, loadUserHistory, history, historyState, historyError, calendarMonth, setCalendarMonth }) {
+function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelectedUserId, historyPreset, setHistoryPreset, historyFrom, setHistoryFrom, historyTo, setHistoryTo, onHistoryPresetChange, loadUserHistory, resetHistoryFilters, history, historyState, historyError, calendarMonth, setCalendarMonth }) {
   const isHistoryLoading = historyState === 'loading';
   const [historyPage, setHistoryPage] = useState(1);
-  const visibleHistory = useMemo(
-    () => filterAttendanceRows(history?.rows || [], { location: historyLocation, search: '', tab: 'all' }),
-    [history, historyLocation],
-  );
+  const visibleHistory = history?.rows || [];
   const visibleSummary = useMemo(() => ({
     late: visibleHistory.filter((row) => row.late).length,
     early: visibleHistory.filter((row) => row.early).length,
@@ -739,7 +736,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [history, historyLocation]);
+  }, [history]);
 
   const pagedHistory = useMemo(
     () => paginateRows(visibleHistory, historyPage, 10),
@@ -783,7 +780,6 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
           </label>
           <label><span>From</span><input type="date" value={historyFrom} onChange={(event) => { setHistoryPreset('custom'); setHistoryFrom(event.target.value); }} /></label>
           <label><span>To</span><input type="date" value={historyTo} onChange={(event) => { setHistoryPreset('custom'); setHistoryTo(event.target.value); }} /></label>
-          <label><span>Location</span><select value={historyLocation} onChange={(event) => setHistoryLocation(event.target.value)}>{LOCATIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
           <button
             className="primary-button"
             type="button"
@@ -796,6 +792,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
               'Load report'
             )}
           </button>
+          <button className="reset-button" type="button" onClick={resetHistoryFilters}>Reset filters</button>
         </div>
         {historyState === 'idle' && <p className="history-message">Select an employee and date range to view attendance history.</p>}
         {isHistoryLoading && (
@@ -921,7 +918,6 @@ function App() {
   const [historyPreset, setHistoryPreset] = useState('latest');
   const [historyFrom, setHistoryFrom] = useState('');
   const [historyTo, setHistoryTo] = useState('');
-  const [historyLocation, setHistoryLocation] = useState('All');
   const [history, setHistory] = useState(null);
   const [historyState, setHistoryState] = useState('idle');
   const [historyError, setHistoryError] = useState('');
@@ -1095,6 +1091,18 @@ function App() {
     setHistoryTo(nextRange.endDate);
   }, []);
 
+  const resetHistoryFilters = useCallback(() => {
+    historyAbortRef.current?.abort();
+    setSelectedUserId('');
+    setHistoryPreset('latest');
+    setHistoryFrom('');
+    setHistoryTo('');
+    setHistory(null);
+    setHistoryState('idle');
+    setHistoryError('');
+    setCalendarMonth('');
+  }, []);
+
   const loadUserHistory = useCallback(() => {
     if (!selectedUserId || (historyPreset !== 'latest' && (!historyFrom || !historyTo))) return;
     historyAbortRef.current?.abort();
@@ -1198,10 +1206,9 @@ function App() {
             setHistoryFrom={setHistoryFrom}
             historyTo={historyTo}
             setHistoryTo={setHistoryTo}
-            historyLocation={historyLocation}
-            setHistoryLocation={setHistoryLocation}
             onHistoryPresetChange={onHistoryPresetChange}
             loadUserHistory={loadUserHistory}
+            resetHistoryFilters={resetHistoryFilters}
             history={history}
             historyState={historyState}
             historyError={historyError}
