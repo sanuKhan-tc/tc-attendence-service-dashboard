@@ -10,6 +10,8 @@ import {
   formatTableDateRange,
   formatTime,
   getOverviewDateRange,
+  isOverviewMetricFlagged,
+  isOverviewRowCritical,
   isTodayDateRange,
   paginateRows,
   presentDaysLabel,
@@ -253,7 +255,7 @@ function SummaryCardsSkeleton() {
   );
 }
 
-function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true, showDuration = false, showSource = false }) {
+function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true, showDuration = false, showSource = false, showStatus = true }) {
   return Array.from({ length: rows }, (_, index) => (
     <tr className="skeleton-row" key={index} aria-hidden="true">
       <td>
@@ -280,7 +282,7 @@ function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, sh
       {showDuration && <td><span className="skeleton skeleton-line w-64" /></td>}
       {!showEmployee && <td><span className="skeleton skeleton-line w-64" /></td>}
       {showSource && <td><span className="skeleton skeleton-line w-110" /></td>}
-      <td><span className="skeleton skeleton-pill w-110" /></td>
+      {showStatus && <td><span className="skeleton skeleton-pill w-110" /></td>}
     </tr>
   ));
 }
@@ -563,7 +565,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
-  const columnCount = isDateRange ? 4 : 8;
+  const columnCount = isDateRange ? 4 : 7;
   const hasTableFilters = location !== 'All' || Boolean(search) || tab !== 'all';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
@@ -624,22 +626,22 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
       <section className="flagged-card">
         <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th><th>Punch source</th></>}<th>Status</th></tr></thead><tbody>
-          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showSource={!isDateRange} />}
+        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th><th>Punch source</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody>
+          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showSource={!isDateRange} showStatus={isDateRange} />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
-          {state === 'ready' && visibleRows.map((row) => <tr className="clickable-table-row" key={row.userId} onClick={() => onSelectUser(row.userId)}>
+          {state === 'ready' && visibleRows.map((row) => <tr className={`clickable-table-row${isOverviewRowCritical(row, isDateRange) ? ' flagged-row-critical' : ''}`} key={row.userId} onClick={() => onSelectUser(row.userId)}>
             <td><button className="employee-cell employee-button" type="button" onClick={(event) => { event.stopPropagation(); onSelectUser(row.userId); }}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
             <td className="num-cell">{formatTableDateRange(startDate, endDate)}</td>
             <td><span className="location-tag">{row.location}</span></td>
             {!isDateRange && (
               <>
-                <td className="num-cell">{formatTime(row.firstIn)}</td>
-                <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</td>
-                <td className="num-cell">{formatDurationBetween(row.firstIn, row.lastOut)}</td>
+                <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'firstIn', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatTime(row.firstIn)}</span></td>
+                <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'lastOut', isDateRange) ? ' metric-pill-alert' : ''}`}>{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</span></td>
+                <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'totalHours', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatDurationBetween(row.firstIn, row.lastOut)}</span></td>
               </>
             )}
             {!isDateRange && <td><PunchSourceCell firstInSource={row.firstInSource} lastOutSource={row.lastOutSource} /></td>}
-            <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, true)}</span>)}</div></td>
+            {isDateRange && <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, true)}</span>)}</div></td>}
           </tr>)}
           {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan={columnCount} className="table-message"><div className="table-empty"><span className="table-empty-icon" aria-hidden="true">✓</span><strong>No flagged staff found</strong><span>{hasTableFilters ? 'Try clearing a filter or choosing another date.' : 'No attendance exceptions were found for this selection.'}</span>{hasTableFilters && <button type="button" className="table-empty-action" onClick={resetFilters}>Clear table filters</button>}</div></td></tr>}
         </tbody></table></div>

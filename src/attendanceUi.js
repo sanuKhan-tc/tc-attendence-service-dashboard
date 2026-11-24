@@ -11,6 +11,17 @@ export function formatDurationBetween(first, last) {
   return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
 }
 
+export function isOverviewMetricFlagged(row, metric, isDateRange) {
+  if (isDateRange) return false;
+  if (metric === 'firstIn') return Boolean(row.late);
+  if (metric === 'lastOut') return Boolean(row.early);
+  return metric === 'totalHours' && Boolean(row.underEight);
+}
+
+export function isOverviewRowCritical(row, isDateRange) {
+  return !isDateRange && Boolean(row.late && row.early && row.underEight);
+}
+
 export function formatAccessSource(firstInSource, lastOutSource) {
   return `In: ${firstInSource || '—'} · Out: ${lastOutSource || '—'}`;
 }

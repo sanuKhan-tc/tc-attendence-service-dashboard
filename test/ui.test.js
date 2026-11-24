@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accessSourceKind, buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatAccessSource, formatDateRange, formatDurationBetween, formatTableDateRange, formatTime, getOverviewDateRange, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
+import { accessSourceKind, buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatAccessSource, formatDateRange, formatDurationBetween, formatTableDateRange, formatTime, getOverviewDateRange, isOverviewMetricFlagged, isOverviewRowCritical, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -16,6 +16,16 @@ test('formats SQL wall-clock timestamps as local display time', () => {
 test('computes total hours from first-in and last-out timestamps', () => {
   assert.equal(formatDurationBetween('2026-11-19T08:30:00Z', '2026-11-19T17:00:00Z'), '8h 30m');
   assert.equal(formatDurationBetween('2026-11-19T08:30:00Z', null), '—');
+});
+
+test('limits overview red metric and row highlights to single-day flags', () => {
+  const row = { late: true, early: true, underEight: true };
+  assert.equal(isOverviewMetricFlagged(row, 'firstIn', false), true);
+  assert.equal(isOverviewMetricFlagged(row, 'lastOut', false), true);
+  assert.equal(isOverviewMetricFlagged(row, 'totalHours', false), true);
+  assert.equal(isOverviewRowCritical(row, false), true);
+  assert.equal(isOverviewMetricFlagged(row, 'firstIn', true), false);
+  assert.equal(isOverviewRowCritical(row, true), false);
 });
 
 test('formats first-in and last-out punch sources', () => {
