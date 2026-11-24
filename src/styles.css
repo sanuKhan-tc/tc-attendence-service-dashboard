@@ -536,6 +536,10 @@ tbody tr:hover {
   background: #fffaf8;
 }
 
+.clickable-table-row {
+  cursor: pointer;
+}
+
 tbody tr:hover .employee-cell b {
   color: var(--tc-coral);
 }
@@ -625,18 +629,6 @@ tbody tr:hover .employee-cell b {
 .access-direction-pill {
   font-size: 10px;
   letter-spacing: 0.04em;
-}
-
-.access-in-pill {
-  background: #e8faf4;
-  border-color: #bcebdc;
-  color: #0e7255;
-}
-
-.access-out-pill {
-  background: #fff4e5;
-  border-color: #f3d4a3;
-  color: #b55e12;
 }
 
 .access-source-separator {

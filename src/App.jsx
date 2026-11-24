@@ -108,12 +108,12 @@ function AccessSourcePill({ source }) {
   return <span className={`access-pill ${accessSourceKind(source)}`}>{source || '—'}</span>;
 }
 
-function PunchSourceCell() {
+function PunchSourceCell({ firstInSource, lastOutSource }) {
   return (
     <div className="access-source-list">
-      <span className="access-pill access-direction-pill access-in-pill">IN</span>
+      <span className={`access-pill access-direction-pill ${accessSourceKind(firstInSource)}`}>IN</span>
       <span className="access-source-separator" aria-hidden="true">-</span>
-      <span className="access-pill access-direction-pill access-out-pill">OUT</span>
+      <span className={`access-pill access-direction-pill ${accessSourceKind(lastOutSource)}`}>OUT</span>
     </div>
   );
 }
@@ -561,7 +561,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
-  const columnCount = isDateRange ? 5 : 7;
+  const columnCount = isDateRange ? 4 : 7;
   const hasTableFilters = location !== 'All' || Boolean(search) || tab !== 'all';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
@@ -622,11 +622,11 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
       <section className="flagged-card">
         <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th></>}<th>Punch source</th><th>Status</th></tr></thead><tbody>
-          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showSource />}
+        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Punch source</th></>}<th>Status</th></tr></thead><tbody>
+          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showSource={!isDateRange} />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
-          {state === 'ready' && visibleRows.map((row) => <tr key={row.userId}>
-            <td><button className="employee-cell employee-button" type="button" onClick={() => onSelectUser(row.userId)}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
+          {state === 'ready' && visibleRows.map((row) => <tr className="clickable-table-row" key={row.userId} onClick={() => onSelectUser(row.userId)}>
+            <td><button className="employee-cell employee-button" type="button" onClick={(event) => { event.stopPropagation(); onSelectUser(row.userId); }}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
             <td className="num-cell">{formatTableDateRange(startDate, endDate)}</td>
             <td><span className="location-tag">{row.location}</span></td>
             {!isDateRange && (
@@ -635,12 +635,12 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
                 <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</td>
               </>
             )}
-            <td><PunchSourceCell /></td>
+            {!isDateRange && <td><PunchSourceCell firstInSource={row.firstInSource} lastOutSource={row.lastOutSource} /></td>}
             <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, true)}</span>)}</div></td>
           </tr>)}
           {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan={columnCount} className="table-message"><div className="table-empty"><span className="table-empty-icon" aria-hidden="true">✓</span><strong>No flagged staff found</strong><span>{hasTableFilters ? 'Try clearing a filter or choosing another date.' : 'No attendance exceptions were found for this selection.'}</span>{hasTableFilters && <button type="button" className="table-empty-action" onClick={resetFilters}>Clear table filters</button>}</div></td></tr>}
         </tbody></table></div>
-        <footer className="table-footer">{isLoading ? <span>Loading attendance records…</span> : <><PunchSourceLegend /><span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
+        <footer className="table-footer">{isLoading ? <span>Loading attendance records…</span> : <>{!isDateRange && <PunchSourceLegend />}<span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
       </section>
     </>
   );
@@ -824,7 +824,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                       <td className="num-cell">{formatTime(row.firstIn)}</td>
                       <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">In office</span>}</td>
                       <td className="num-cell">{row.recordedTime}</td>
-                      <td><PunchSourceCell /></td>
+                      <td><PunchSourceCell firstInSource={row.firstInSource} lastOutSource={row.lastOutSource} /></td>
                       <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
                     </tr>
                   ))}
@@ -929,6 +929,7 @@ function App() {
   const lastAttendanceKeyRef = useRef('');
   const attendanceCacheRef = useRef(new Map());
   const historyAbortRef = useRef(null);
+  const historyLoadRequestedRef = useRef(false);
 
   useEffect(() => {
     const onHashChange = () => setPage(pageFromHash());
@@ -1059,10 +1060,19 @@ function App() {
   const userOptions = useMemo(() => [...(users.length ? users : report.rows)].sort((a, b) => a.employee.localeCompare(b.employee)), [report.rows, users]);
 
   const openUserReport = useCallback((userId) => {
+    const nextFrom = startDate;
+    const nextTo = endDate;
     setSelectedUserId(userId);
-    setCalendarMonth((historyTo || endDate || startDate || '2026-01').slice(0, 7));
+    setHistoryPreset(nextFrom && nextTo ? 'custom' : 'latest');
+    setHistoryFrom(nextFrom);
+    setHistoryTo(nextTo);
+    setHistory(null);
+    setHistoryState('idle');
+    setHistoryError('');
+    historyLoadRequestedRef.current = true;
+    setCalendarMonth((nextTo || nextFrom || '2026-01').slice(0, 7));
     window.location.hash = 'user-report';
-  }, [historyTo, endDate, startDate]);
+  }, [endDate, startDate]);
 
   const resetFilters = useCallback(() => {
     lastAttendanceKeyRef.current = '';
@@ -1093,6 +1103,7 @@ function App() {
 
   const resetHistoryFilters = useCallback(() => {
     historyAbortRef.current?.abort();
+    historyLoadRequestedRef.current = false;
     setSelectedUserId('');
     setHistoryPreset('latest');
     setHistoryFrom('');
@@ -1143,6 +1154,12 @@ function App() {
         }
       });
   }, [historyFrom, historyPreset, historyTo, selectedUserId]);
+
+  useEffect(() => {
+    if (page !== 'user-report' || !selectedUserId || !historyLoadRequestedRef.current) return;
+    historyLoadRequestedRef.current = false;
+    loadUserHistory();
+  }, [page, selectedUserId, loadUserHistory]);
 
   const exportOverview = useCallback(async () => {
     setIsExporting(true);
