@@ -43,6 +43,11 @@ export function getOverviewDateRange(preset, today = new Date()) {
   return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) };
 }
 
+export function isTodayDateRange(startDate, endDate, today = new Date()) {
+  const todayDate = getOverviewDateRange('today', today).startDate;
+  return startDate === todayDate && endDate === todayDate;
+}
+
 export function formatTableDateRange(startDate, endDate) {
   const formatTableDate = (value) => {
     if (!value) return 'Latest available';

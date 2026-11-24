@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, getOverviewDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, getOverviewDateRange, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -84,4 +84,12 @@ test('builds overview date presets from local calendar dates', () => {
   assert.deepEqual(getOverviewDateRange('last-3-months', today), { startDate: '2025-11-01', endDate: '2026-01-15' });
   assert.deepEqual(getOverviewDateRange('last-6-months', today), { startDate: '2025-08-01', endDate: '2026-01-15' });
   assert.deepEqual(getOverviewDateRange('week', new Date(2026, 0, 11)), { startDate: '2026-01-11', endDate: '2026-01-11' });
+});
+
+test('recognizes only an exact today overview date', () => {
+  const today = new Date(2026, 0, 15);
+
+  assert.equal(isTodayDateRange('2026-01-15', '2026-01-15', today), true);
+  assert.equal(isTodayDateRange('2026-01-14', '2026-01-14', today), false);
+  assert.equal(isTodayDateRange('2026-01-01', '2026-01-15', today), false);
 });

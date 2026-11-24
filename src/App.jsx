@@ -8,6 +8,7 @@ import {
   formatTableDateRange,
   formatTime,
   getOverviewDateRange,
+  isTodayDateRange,
   paginateRows,
   presentDaysLabel,
 } from './attendanceUi.js';
@@ -533,6 +534,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
 function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange }) {
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
+  const isToday = isTodayDateRange(startDate, endDate);
   const columnCount = isDateRange ? 4 : 6;
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
@@ -603,7 +605,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
             {!isDateRange && (
               <>
                 <td className="num-cell">{formatTime(row.firstIn)}</td>
-                <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">Not logged out</span>}</td>
+                <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</td>
               </>
             )}
             <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, isDateRange)}</span>)}</div></td>
