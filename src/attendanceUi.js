@@ -4,6 +4,13 @@ export function formatTime(value) {
   return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+export function formatDurationBetween(first, last) {
+  if (!first || !last) return '—';
+  const minutes = Math.round((new Date(last).getTime() - new Date(first).getTime()) / 60000);
+  if (!Number.isFinite(minutes) || minutes < 0) return '—';
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, '0')}m`;
+}
+
 export function formatAccessSource(firstInSource, lastOutSource) {
   return `In: ${firstInSource || '—'} · Out: ${lastOutSource || '—'}`;
 }
