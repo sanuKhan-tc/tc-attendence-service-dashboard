@@ -7,6 +7,7 @@ import {
   filterEmployeeOptions,
   formatTableDateRange,
   formatTime,
+  getOverviewDateRange,
   paginateRows,
   presentDaysLabel,
 } from './attendanceUi.js';
@@ -14,6 +15,15 @@ import { fetchAllAttendanceRows } from './attendanceExport.js';
 import versionInfo from '../version.json';
 
 const LOCATIONS = ['All', 'Dubai', 'India', 'India - Hyderabad', 'India - Noida', 'India - Chennai'];
+const OVERVIEW_DATE_PRESETS = [
+  { value: 'latest', label: 'Latest available' },
+  { value: 'today', label: 'Today' },
+  { value: 'yesterday', label: 'Yesterday' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+  { value: 'last-3-months', label: 'Last 3 months' },
+  { value: 'last-6-months', label: 'Last 6 months' },
+];
 const TABS = [
   { id: 'all', label: 'All flagged' },
   { id: 'late', label: 'Late arrivals' },
@@ -520,7 +530,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   );
 });
 
-function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError }) {
+function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange }) {
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const columnCount = isDateRange ? 4 : 6;
@@ -545,20 +555,22 @@ function DashboardPage({ startDate, setStartDate, endDate, setEndDate, location,
       <section className="filter-card" aria-label="Attendance filters">
         <label>
           <span>Day</span>
+          <span className="weekend-hint">Sat &amp; Sun are off days</span>
           <div className={isLoading ? 'select-wrap is-loading' : 'select-wrap'}>
-            <select value="Latest available" aria-label="Day" readOnly disabled={isLoading}>
-              <option>Latest available</option>
+            <select value={datePreset} aria-label="Day" onChange={(event) => onPresetChange(event.target.value)} disabled={isLoading}>
+              {datePreset === 'custom' && <option value="custom" disabled>Custom range</option>}
+              {OVERVIEW_DATE_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
             </select>
             {isLoading && <span className="field-loader" aria-hidden="true"><Spinner size={14} /></span>}
           </div>
         </label>
         <label>
           <span>Start date</span>
-          <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+          <input type="date" value={startDate} onChange={(event) => { setDatePreset('custom'); setStartDate(event.target.value); }} />
         </label>
         <label>
           <span>End date</span>
-          <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
+          <input type="date" value={endDate} onChange={(event) => { setDatePreset('custom'); setEndDate(event.target.value); }} />
         </label>
         <label>
           <span>Location</span>
@@ -841,6 +853,7 @@ function ChangelogPage() {
 
 function App() {
   const [page, setPage] = useState(pageFromHash);
+  const [datePreset, setDatePreset] = useState('latest');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [location, setLocation] = useState('All');
@@ -1006,6 +1019,7 @@ function App() {
   const resetFilters = useCallback(() => {
     lastAttendanceKeyRef.current = '';
     attendanceCacheRef.current.clear();
+    setDatePreset('latest');
     setStartDate('');
     setEndDate('');
     setLocation('All');
@@ -1013,6 +1027,13 @@ function App() {
     setDebouncedSearch('');
     setTab('all');
     setPageNumber(1);
+  }, []);
+
+  const onPresetChange = useCallback((preset) => {
+    const nextRange = getOverviewDateRange(preset);
+    setDatePreset(preset);
+    setStartDate(nextRange.startDate);
+    setEndDate(nextRange.endDate);
   }, []);
 
   const loadUserHistory = useCallback(() => {
@@ -1076,6 +1097,8 @@ function App() {
       <main className="app-shell">
         {page === 'dashboard' ? (
           <DashboardPage
+            datePreset={datePreset}
+            setDatePreset={setDatePreset}
             startDate={startDate}
             setStartDate={setStartDate}
             endDate={endDate}
@@ -1096,6 +1119,7 @@ function App() {
             onExport={exportOverview}
             isExporting={isExporting}
             exportError={exportError}
+            onPresetChange={onPresetChange}
           />
         ) : page === 'user-report' ? (
           <UserReportPage

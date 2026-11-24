@@ -236,6 +236,14 @@ label {
 
 label span { padding-left: 2px; }
 
+.weekend-hint {
+  color: var(--tc-text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
 select,
 input {
   height: 42px;

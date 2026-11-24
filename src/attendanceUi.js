@@ -18,6 +18,31 @@ export function formatDateRange(startDate, endDate) {
   return `${startDate} – ${endDate}`;
 }
 
+function formatLocalDate(date) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+}
+
+export function getOverviewDateRange(preset, today = new Date()) {
+  const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (preset === 'latest') return { startDate: '', endDate: '' };
+  if (preset === 'today') return { startDate: formatLocalDate(end), endDate: formatLocalDate(end) };
+
+  if (preset === 'yesterday') {
+    end.setDate(end.getDate() - 1);
+    return { startDate: formatLocalDate(end), endDate: formatLocalDate(end) };
+  }
+
+  if (preset === 'week') {
+    const start = new Date(end);
+    start.setDate(start.getDate() - start.getDay());
+    return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) };
+  }
+
+  const monthsBack = preset === 'last-3-months' ? 2 : preset === 'last-6-months' ? 5 : 0;
+  const start = new Date(end.getFullYear(), end.getMonth() - monthsBack, 1);
+  return { startDate: formatLocalDate(start), endDate: formatLocalDate(end) };
+}
+
 export function formatTableDateRange(startDate, endDate) {
   const formatTableDate = (value) => {
     if (!value) return 'Latest available';

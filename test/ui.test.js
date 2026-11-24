@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, getOverviewDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -71,4 +71,17 @@ test('formats overview date ranges', () => {
 test('formats flagged-table dates as a single date or compact range', () => {
   assert.equal(formatTableDateRange('2026-10-12', '2026-10-12'), '12/Oct');
   assert.equal(formatTableDateRange('2026-10-01', '2026-10-12'), '01/Oct – 12/Oct');
+});
+
+test('builds overview date presets from local calendar dates', () => {
+  const today = new Date(2026, 0, 15);
+
+  assert.deepEqual(getOverviewDateRange('latest', today), { startDate: '', endDate: '' });
+  assert.deepEqual(getOverviewDateRange('today', today), { startDate: '2026-01-15', endDate: '2026-01-15' });
+  assert.deepEqual(getOverviewDateRange('yesterday', today), { startDate: '2026-01-14', endDate: '2026-01-14' });
+  assert.deepEqual(getOverviewDateRange('week', today), { startDate: '2026-01-11', endDate: '2026-01-15' });
+  assert.deepEqual(getOverviewDateRange('month', today), { startDate: '2026-01-01', endDate: '2026-01-15' });
+  assert.deepEqual(getOverviewDateRange('last-3-months', today), { startDate: '2025-11-01', endDate: '2026-01-15' });
+  assert.deepEqual(getOverviewDateRange('last-6-months', today), { startDate: '2025-08-01', endDate: '2026-01-15' });
+  assert.deepEqual(getOverviewDateRange('week', new Date(2026, 0, 11)), { startDate: '2026-01-11', endDate: '2026-01-11' });
 });
