@@ -487,8 +487,7 @@ h2 {
 .table-wrap { overflow-x: auto; }
 
 .flagged-table-wrap {
-  max-height: min(620px, 68vh);
-  overflow: auto;
+  overflow-x: auto;
 }
 
 table {
