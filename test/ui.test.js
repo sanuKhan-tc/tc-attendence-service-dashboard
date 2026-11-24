@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatTableDateRange, formatTime, getOverviewDateRange, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatAccessSource, formatDateRange, formatTableDateRange, formatTime, getOverviewDateRange, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -11,6 +11,11 @@ const rows = [
 test('formats SQL wall-clock timestamps as local display time', () => {
   assert.equal(formatTime('2026-11-19T08:31:00Z'), '08:31');
   assert.equal(formatTime(null), '—');
+});
+
+test('formats first-in and last-out punch sources', () => {
+  assert.equal(formatAccessSource('Face ID', 'Door Access'), 'In: Face ID · Out: Door Access');
+  assert.equal(formatAccessSource('Face ID', null), 'In: Face ID · Out: —');
 });
 
 test('filters by location, employee search, and report tab', () => {

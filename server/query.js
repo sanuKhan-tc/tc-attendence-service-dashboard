@@ -1,7 +1,7 @@
 function deviceMapSql(devices) {
   return devices
-    .map(({ mid, location, lateCutoff, officeEnd }) =>
-      `(${mid}, N'${location.replaceAll("'", "''")}', CONVERT(time, N'${lateCutoff}:00'), CONVERT(time, N'${officeEnd}:00'))`)
+    .map(({ mid, location, lateCutoff, officeEnd, fallbackFor }) =>
+      `(${mid}, N'${location.replaceAll("'", "''")}', CONVERT(time, N'${lateCutoff}:00'), CONVERT(time, N'${officeEnd}:00'), N'${fallbackFor != null ? 'Door Access' : 'Face ID'}')`)
     .join(',\n    ');
 }
 
@@ -9,14 +9,39 @@ function punchValuesSql() {
   return Array.from({ length: 12 }, (_, index) => `        (a.P${index + 1}MID, a.Punch${index + 1}, ${index + 1})`).join(',\n');
 }
 
+function primaryPunchValuesSql() {
+  return Array.from({ length: 12 }, (_, index) => `        (a.P${index + 1}MID, a.Punch${index + 1})`).join(',\n');
+}
+
 function devicePresenceFilterSql(mids) {
   return Array.from({ length: 12 }, (_, index) => `a.P${index + 1}MID IN (${mids})`).join(' OR ');
+}
+
+function fallbackPunchFilterSql(devices) {
+  const fallbackDevices = devices.filter(({ fallbackFor }) => fallbackFor != null);
+  if (!fallbackDevices.length) return '';
+
+  const fallbackMids = fallbackDevices.map(({ mid }) => mid).join(', ');
+  const primaryMids = [...new Set(fallbackDevices.map(({ fallbackFor }) => fallbackFor))].join(', ');
+  return `
+        AND (
+          v.MID NOT IN (${fallbackMids})
+          OR NOT EXISTS (
+            SELECT 1
+            FROM (VALUES
+${primaryPunchValuesSql()}
+            ) AS PrimaryPunches(MID, PunchTime)
+            WHERE PrimaryPunches.MID IN (${primaryMids})
+              AND PrimaryPunches.PunchTime IS NOT NULL
+          )
+        )`;
 }
 
 function buildScopedAttendanceQuery(devices, dateFilter, userFilter = '', { paginated = false } = {}) {
   const mids = devices.map(({ mid }) => mid).join(', ');
   const punchValues = punchValuesSql();
   const deviceFilter = devicePresenceFilterSql(mids);
+  const fallbackPunchFilter = fallbackPunchFilterSql(devices);
 
   const finalSelect = paginated ? `, GroupedRows AS (
   SELECT
@@ -39,6 +64,8 @@ SELECT
   g.location,
   g.firstIn,
   g.lastEvent,
+  firstInSource.value AS firstInSource,
+  lastOutSource.value AS lastOutSource,
   g.lateCount,
   g.earlyCount,
   g.underEightCount,
@@ -47,6 +74,21 @@ SELECT
   SUM(CASE WHEN g.earlyCount > 0 THEN 1 ELSE 0 END) OVER() AS totalEarly,
   SUM(CASE WHEN g.underEightCount > 0 THEN 1 ELSE 0 END) OVER() AS totalUnderEight
 FROM GroupedRows AS g
+OUTER APPLY (
+  SELECT TOP (1) r.firstInSource AS value
+  FROM ResolvedRows AS r
+  WHERE r.userId = g.userId
+    AND (@location = N'All' OR r.location = @location OR (@location = N'India' AND r.location LIKE N'India%'))
+  ORDER BY r.firstIn, r.lastEvent, r.firstInSource
+) AS firstInSource
+OUTER APPLY (
+  SELECT TOP (1) r.lastOutSource AS value
+  FROM ResolvedRows AS r
+  WHERE r.userId = g.userId
+    AND r.lastEvent IS NOT NULL
+    AND (@location = N'All' OR r.location = @location OR (@location = N'India' AND r.location LIKE N'India%'))
+  ORDER BY r.lastEvent DESC, r.firstIn DESC
+) AS lastOutSource
 WHERE (
   (@tab = N'all' AND (g.lateCount > 0 OR g.earlyCount > 0 OR g.underEightCount > 0))
   OR (@tab = N'late' AND g.lateCount > 0)
@@ -62,15 +104,17 @@ SELECT
   r.location,
   r.firstIn,
   r.lastEvent,
+  r.firstInSource,
+  r.lastOutSource,
   r.workTime
 FROM ResolvedRows AS r
 ORDER BY r.firstIn, r.userId;`;
 
   return `
-WITH DeviceMap (MID, Location, LateCutoff, OfficeEnd) AS (
+WITH DeviceMap (MID, Location, LateCutoff, OfficeEnd, AccessType) AS (
   SELECT * FROM (VALUES
     ${deviceMapSql(devices)}
-  ) AS Devices(MID, Location, LateCutoff, OfficeEnd)
+  ) AS Devices(MID, Location, LateCutoff, OfficeEnd, AccessType)
 ), AttendanceRows AS (
   SELECT
     a.UserID,
@@ -99,6 +143,8 @@ WITH DeviceMap (MID, Location, LateCutoff, OfficeEnd) AS (
     m.Location AS location,
     punches.FirstIn AS firstIn,
     CASE WHEN punches.EventCount > 1 THEN punches.LastEvent END AS lastEvent,
+    m.AccessType AS firstInSource,
+    CASE WHEN punches.EventCount > 1 THEN lastDevice.AccessType END AS lastOutSource,
     a.WorkTime AS workTime,
     CASE WHEN CONVERT(time, punches.FirstIn) > m.LateCutoff THEN 1 ELSE 0 END AS late,
     CASE WHEN punches.EventCount > 1 AND CONVERT(time, punches.LastEvent) < m.OfficeEnd THEN 1 ELSE 0 END AS early,
@@ -109,20 +155,23 @@ WITH DeviceMap (MID, Location, LateCutoff, OfficeEnd) AS (
       MIN(p.PunchTime) AS FirstIn,
       MAX(p.PunchTime) AS LastEvent,
       COUNT_BIG(*) AS EventCount,
-      MAX(CASE WHEN p.rn = 1 THEN p.MID END) AS FirstMID
+      MAX(CASE WHEN p.rn = 1 THEN p.MID END) AS FirstMID,
+      MAX(CASE WHEN p.lastRn = 1 THEN p.MID END) AS LastMID
     FROM (
       SELECT
         v.MID,
         v.PunchTime,
         ROW_NUMBER() OVER (ORDER BY v.PunchTime, v.PunchNo) AS rn
+        ,ROW_NUMBER() OVER (ORDER BY v.PunchTime DESC, v.PunchNo DESC) AS lastRn
       FROM (VALUES
 ${punchValues}
       ) AS v(MID, PunchTime, PunchNo)
       WHERE v.MID IN (${mids})
-        AND v.PunchTime IS NOT NULL
+        AND v.PunchTime IS NOT NULL${fallbackPunchFilter}
     ) AS p
   ) AS punches
   INNER JOIN DeviceMap AS m ON m.MID = punches.FirstMID
+  LEFT JOIN DeviceMap AS lastDevice ON lastDevice.MID = punches.LastMID
   LEFT JOIN dbo.Mx_UserMst AS u ON u.UserID = a.UserID
   WHERE punches.FirstIn IS NOT NULL
 )${finalSelect}`;

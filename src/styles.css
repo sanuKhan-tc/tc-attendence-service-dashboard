@@ -588,6 +588,13 @@ tbody tr:hover {
   font-weight: 700;
 }
 
+.access-source {
+  color: var(--tc-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .in-office {
   display: inline-flex;
   align-items: center;

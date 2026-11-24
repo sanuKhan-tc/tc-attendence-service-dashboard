@@ -18,6 +18,7 @@ Read-only attendance reporting for biometric face identification at the Dubai of
 | Office | Device | Type | Late cutoff | Office end |
 | --- | --- | --- | --- | --- |
 | Dubai | `TA-tc Dubai-Device-1` | Biometric face ID | 08:30 | 17:00 |
+| Dubai fallback | `Main Door -114`, `Main Door-113`, `Main Door-214`, `Main Door -116`, `Panel200-Device-1` (`Second Door-110`, `Main Door 110`, `Main Door-107`) | Registered access doors used when the Dubai device has no punches | 08:30 | 17:00 |
 | India | `TC-Hyderabad` | Biometric attendance | 09:30 | 18:00 |
 | India | `TC-Noida` | Biometric attendance | 09:30 | 18:00 |
 | India | `TC- Chennai` | Biometric attendance | 09:30 | 18:00 |

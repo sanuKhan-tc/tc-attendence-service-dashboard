@@ -5,6 +5,7 @@ import {
   dataSourceLabel,
   filterAttendanceRows,
   filterEmployeeOptions,
+  formatAccessSource,
   formatTableDateRange,
   formatTime,
   getOverviewDateRange,
@@ -227,7 +228,7 @@ function SummaryCardsSkeleton() {
   );
 }
 
-function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true }) {
+function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true, showSource = false }) {
   return Array.from({ length: rows }, (_, index) => (
     <tr className="skeleton-row" key={index} aria-hidden="true">
       <td>
@@ -252,6 +253,7 @@ function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, sh
         </>
       )}
       {!showEmployee && <td><span className="skeleton skeleton-line w-64" /></td>}
+      {showSource && <td><span className="skeleton skeleton-line w-110" /></td>}
       <td><span className="skeleton skeleton-pill w-110" /></td>
     </tr>
   ));
@@ -535,7 +537,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
-  const columnCount = isDateRange ? 4 : 6;
+  const columnCount = isDateRange ? 5 : 7;
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
     return filterAttendanceRows(flaggedRows, { location, search, tab });
@@ -595,8 +597,8 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
       <section className="flagged-card">
         <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th></>}<th>Status</th></tr></thead><tbody>
-          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} />}
+        <div className="table-wrap"><table><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th></>}<th>Punch source</th><th>Status</th></tr></thead><tbody>
+          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showSource />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
           {state === 'ready' && visibleRows.map((row) => <tr key={row.userId}>
             <td><button className="employee-cell employee-button" type="button" onClick={() => onSelectUser(row.userId)}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
@@ -608,6 +610,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
                 <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</td>
               </>
             )}
+            <td><span className="access-source">{formatAccessSource(row.firstInSource, row.lastOutSource)}</span></td>
             <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, isDateRange)}</span>)}</div></td>
           </tr>)}
           {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan={columnCount} className="table-message">No flagged attendance for this selection.</td></tr>}
@@ -696,17 +699,26 @@ const AttendanceCalendar = memo(function AttendanceCalendar({ rows, month, setMo
   );
 });
 
-function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelectedUserId, historyFrom, setHistoryFrom, historyTo, setHistoryTo, loadUserHistory, history, historyState, historyError, calendarMonth, setCalendarMonth }) {
+function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelectedUserId, historyPreset, setHistoryPreset, historyFrom, setHistoryFrom, historyTo, setHistoryTo, historyLocation, setHistoryLocation, onHistoryPresetChange, loadUserHistory, history, historyState, historyError, calendarMonth, setCalendarMonth }) {
   const isHistoryLoading = historyState === 'loading';
   const [historyPage, setHistoryPage] = useState(1);
+  const visibleHistory = useMemo(
+    () => filterAttendanceRows(history?.rows || [], { location: historyLocation, search: '', tab: 'all' }),
+    [history, historyLocation],
+  );
+  const visibleSummary = useMemo(() => ({
+    late: visibleHistory.filter((row) => row.late).length,
+    early: visibleHistory.filter((row) => row.early).length,
+    underEight: visibleHistory.filter((row) => row.underEight).length,
+  }), [visibleHistory]);
 
   useEffect(() => {
     setHistoryPage(1);
-  }, [history]);
+  }, [history, historyLocation]);
 
   const pagedHistory = useMemo(
-    () => paginateRows(history?.rows || [], historyPage, 10),
-    [history, historyPage],
+    () => paginateRows(visibleHistory, historyPage, 10),
+    [historyPage, visibleHistory],
   );
 
   return (
@@ -724,7 +736,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <h2>User report</h2>
             <p className="page-subtitle">Review attendance for one employee across selected dates.</p>
           </div>
-          <div className="section-actions"><button className="reset-button" type="button" onClick={() => exportAttendanceExcel(history?.rows || [], `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !history?.rows.length}>Export Excel</button></div>
+          <div className="section-actions"><button className="reset-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>Export Excel</button></div>
         </div>
         <div className="history-controls">
           <div className="control-field employee-combobox-field">
@@ -736,13 +748,22 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
               loading={usersLoading}
             />
           </div>
-          <label><span>From</span><input type="date" value={historyFrom} onChange={(event) => setHistoryFrom(event.target.value)} /></label>
-          <label><span>To</span><input type="date" value={historyTo} onChange={(event) => setHistoryTo(event.target.value)} /></label>
+          <label>
+            <span>Day</span>
+            <span className="weekend-hint">Sat &amp; Sun are off days</span>
+            <select value={historyPreset} aria-label="User report day" onChange={(event) => onHistoryPresetChange(event.target.value)}>
+              {historyPreset === 'custom' && <option value="custom" disabled>Custom range</option>}
+              {OVERVIEW_DATE_PRESETS.map((preset) => <option key={preset.value} value={preset.value}>{preset.label}</option>)}
+            </select>
+          </label>
+          <label><span>From</span><input type="date" value={historyFrom} onChange={(event) => { setHistoryPreset('custom'); setHistoryFrom(event.target.value); }} /></label>
+          <label><span>To</span><input type="date" value={historyTo} onChange={(event) => { setHistoryPreset('custom'); setHistoryTo(event.target.value); }} /></label>
+          <label><span>Location</span><select value={historyLocation} onChange={(event) => setHistoryLocation(event.target.value)}>{LOCATIONS.map((item) => <option key={item}>{item}</option>)}</select></label>
           <button
             className="primary-button"
             type="button"
             onClick={loadUserHistory}
-            disabled={!selectedUserId || !historyFrom || !historyTo || isHistoryLoading}
+            disabled={!selectedUserId || (historyPreset !== 'latest' && (!historyFrom || !historyTo)) || isHistoryLoading}
           >
             {isHistoryLoading ? (
               <span className="button-loading"><Spinner light size={14} />Loading…</span>
@@ -758,8 +779,8 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <ChartsSkeleton />
             <div className="table-wrap history-table">
               <table>
-                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
-                <tbody><TableRowsSkeleton rows={5} showEmployee={false} /></tbody>
+                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Punch source</th><th>Status</th></tr></thead>
+                <tbody><TableRowsSkeleton rows={5} showEmployee={false} showSource /></tbody>
               </table>
             </div>
           </>
@@ -767,12 +788,12 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
         {historyState === 'error' && <p className="history-message error-message">{historyError}</p>}
         {historyState === 'ready' && (
           <>
-            <SummaryCards summary={history.summary} presentDaysRows={history.rows} />
-            <AttendanceCalendar rows={history.rows} month={calendarMonth} setMonth={setCalendarMonth} />
-            <HistoryCharts rows={history.rows} />
+            <SummaryCards summary={visibleSummary} presentDaysRows={visibleHistory} />
+            <AttendanceCalendar rows={visibleHistory} month={calendarMonth} setMonth={setCalendarMonth} />
+            <HistoryCharts rows={visibleHistory} />
             <div className="table-wrap history-table">
               <table>
-                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
+                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Punch source</th><th>Status</th></tr></thead>
                 <tbody>
                   {pagedHistory.rows.map((row) => (
                     <tr key={`${row.userId}-${row.date}`}>
@@ -781,17 +802,18 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                       <td className="num-cell">{formatTime(row.firstIn)}</td>
                       <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">In office</span>}</td>
                       <td className="num-cell">{row.recordedTime}</td>
+                      <td><span className="access-source">{formatAccessSource(row.firstInSource, row.lastOutSource)}</span></td>
                       <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
                     </tr>
                   ))}
-                  {pagedHistory.total === 0 && <tr><td colSpan="6" className="table-message">No attendance history for this employee and date range.</td></tr>}
+                  {pagedHistory.total === 0 && <tr><td colSpan="7" className="table-message">No attendance history for this employee and date range.</td></tr>}
                 </tbody>
               </table>
             </div>
             <footer className="table-footer">
               <span>
                 {pagedHistory.total
-                  ? `Showing ${pagedHistory.rows.length} of ${pagedHistory.total} records (${presentDaysLabel(history.rows)} present days) · Page ${pagedHistory.page} of ${pagedHistory.totalPages}`
+                  ? `Showing ${pagedHistory.rows.length} of ${pagedHistory.total} records (${presentDaysLabel(visibleHistory)} present days) · Page ${pagedHistory.page} of ${pagedHistory.totalPages}`
                   : 'No records'}
               </span>
               {pagedHistory.total > 0 && (
@@ -870,8 +892,10 @@ function App() {
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState('');
   const [selectedUserId, setSelectedUserId] = useState('');
+  const [historyPreset, setHistoryPreset] = useState('latest');
   const [historyFrom, setHistoryFrom] = useState('');
   const [historyTo, setHistoryTo] = useState('');
+  const [historyLocation, setHistoryLocation] = useState('All');
   const [history, setHistory] = useState(null);
   const [historyState, setHistoryState] = useState('idle');
   const [historyError, setHistoryError] = useState('');
@@ -1038,25 +1062,38 @@ function App() {
     setEndDate(nextRange.endDate);
   }, []);
 
+  const onHistoryPresetChange = useCallback((preset) => {
+    const nextRange = getOverviewDateRange(preset);
+    setHistoryPreset(preset);
+    setHistoryFrom(nextRange.startDate);
+    setHistoryTo(nextRange.endDate);
+  }, []);
+
   const loadUserHistory = useCallback(() => {
-    if (!selectedUserId || !historyFrom || !historyTo) return;
+    if (!selectedUserId || (historyPreset !== 'latest' && (!historyFrom || !historyTo))) return;
     historyAbortRef.current?.abort();
     const controller = new AbortController();
     historyAbortRef.current = controller;
 
-    setCalendarMonth(historyTo.slice(0, 7));
+    if (historyTo) setCalendarMonth(historyTo.slice(0, 7));
     setHistoryState('loading');
     setHistoryError('');
 
-    fetch(
-      `/api/attendance/history?userId=${encodeURIComponent(selectedUserId)}&from=${encodeURIComponent(historyFrom)}&to=${encodeURIComponent(historyTo)}`,
-      { signal: controller.signal },
-    )
+    const params = new URLSearchParams({ userId: selectedUserId });
+    if (historyFrom) params.set('from', historyFrom);
+    if (historyTo) params.set('to', historyTo);
+
+    fetch(`/api/attendance/history?${params}`, { signal: controller.signal })
       .then((response) => {
         if (!response.ok) throw new Error('Unable to load user history');
         return response.json();
       })
       .then((nextHistory) => {
+        if (nextHistory.from) setHistoryFrom(nextHistory.from);
+        if (nextHistory.to) {
+          setHistoryTo(nextHistory.to);
+          setCalendarMonth(nextHistory.to.slice(0, 7));
+        }
         setHistory(nextHistory);
         setHistoryState('ready');
       })
@@ -1071,7 +1108,7 @@ function App() {
           historyAbortRef.current = null;
         }
       });
-  }, [selectedUserId, historyFrom, historyTo]);
+  }, [historyFrom, historyPreset, historyTo, selectedUserId]);
 
   const exportOverview = useCallback(async () => {
     setIsExporting(true);
@@ -1129,10 +1166,15 @@ function App() {
             usersLoading={usersLoading}
             selectedUserId={selectedUserId}
             setSelectedUserId={setSelectedUserId}
+            historyPreset={historyPreset}
+            setHistoryPreset={setHistoryPreset}
             historyFrom={historyFrom}
             setHistoryFrom={setHistoryFrom}
             historyTo={historyTo}
             setHistoryTo={setHistoryTo}
+            historyLocation={historyLocation}
+            setHistoryLocation={setHistoryLocation}
+            onHistoryPresetChange={onHistoryPresetChange}
             loadUserHistory={loadUserHistory}
             history={history}
             historyState={historyState}

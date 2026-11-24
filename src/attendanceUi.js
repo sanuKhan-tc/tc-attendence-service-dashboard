@@ -4,6 +4,10 @@ export function formatTime(value) {
   return `${String(date.getUTCHours()).padStart(2, '0')}:${String(date.getUTCMinutes()).padStart(2, '0')}`;
 }
 
+export function formatAccessSource(firstInSource, lastOutSource) {
+  return `In: ${firstInSource || '—'} · Out: ${lastOutSource || '—'}`;
+}
+
 export function presentDaysLabel(rows) {
   return rows.length ? String(rows.length) : 'No records';
 }

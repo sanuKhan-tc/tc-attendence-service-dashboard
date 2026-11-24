@@ -109,9 +109,22 @@ app.get('/api/attendance', async (request, response) => {
 
 app.get('/api/attendance/history', async (request, response) => {
   const userId = String(request.query.userId || '').trim();
-  const from = String(request.query.from || '').trim();
-  const to = String(request.query.to || '').trim();
+  let from = String(request.query.from || '').trim();
+  let to = String(request.query.to || '').trim();
   const forceRefresh = isForceRefresh(request);
+  const todayDate = today();
+
+  if (!from && !to) {
+    try {
+      const latest = await latestDateCache.getOrLoad('latest', () => fetchLatestAttendanceDate(), { forceRefresh });
+      from = latest.value || todayDate;
+      to = from;
+    } catch (error) {
+      console.error(error);
+      response.status(500).json({ error: 'Unable to resolve the latest attendance date.' });
+      return;
+    }
+  }
 
   if (!userId || !from || !to || from > to) {
     response.status(400).json({ error: 'userId, from, and to are required.' });
@@ -119,7 +132,6 @@ app.get('/api/attendance/history', async (request, response) => {
   }
 
   const signal = createRequestSignal(request, response);
-  const todayDate = today();
   const cacheKey = `${userId}|${from}|${to}`;
   const ttlOverrideMs = resolveRangeTtl(to, todayDate);
   const staleOverrideMs = to < todayDate ? 300_000 : 90_000;
