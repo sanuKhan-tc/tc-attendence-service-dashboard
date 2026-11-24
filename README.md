@@ -57,7 +57,7 @@ The Vite development server proxies `/api` requests to the Express API. The Expr
 .\scripts\setup-and-run.ps1
 ```
 
-The setup script pulls the latest Git changes on every restart, reads and displays the application version from `version.json`, then uses Windows SQL authentication to create the read-only SQL login `tc_attendance_reader`, creates its `COSEC` database user with `db_datareader` access, creates `.env` on the first run, and builds/starts the Docker container. It prints a confirmation after the pull completes.
+The setup script pulls the latest Git changes on every restart, reads and displays the application version from `version.json`, then uses `DB_SERVER`, `DB_DATABASE`, and `DOCKER_DB_USER` from an existing `.env` when available. On the first run it generates a random SQL password, creates the read-only SQL login and its database user with `db_datareader` access, creates `.env`, and builds/starts the Docker container. It prints a confirmation after the pull completes.
 
 Open <http://localhost:9200>.
 

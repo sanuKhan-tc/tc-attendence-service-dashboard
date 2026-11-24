@@ -1,8 +1,8 @@
 [CmdletBinding()]
 param(
-  [string]$SqlServer = 'localhost',
-  [string]$Database = 'COSEC',
-  [string]$ReadUser = 'tc_attendance_reader'
+  [string]$SqlServer,
+  [string]$Database,
+  [string]$ReadUser
 )
 
 $ErrorActionPreference = 'Stop'
@@ -13,6 +13,36 @@ function Require-Command([string]$Name) {
   if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
     throw "$Name is required but was not found in PATH."
   }
+}
+
+function Read-EnvValues([string]$Path) {
+  $values = @{}
+  if (-not (Test-Path -LiteralPath $Path)) { return ,$values }
+
+  foreach ($line in Get-Content -LiteralPath $Path) {
+    if ($line -match '^\s*([^#=\s]+)\s*=\s*(.*)\s*$') {
+      $key = $matches[1]
+      $value = $matches[2].Trim()
+      if ($value.Length -ge 2 -and $value.StartsWith('"') -and $value.EndsWith('"')) {
+        $value = $value.Substring(1, $value.Length - 2).Replace('\"', '"')
+      }
+      $values[$key] = $value
+    }
+  }
+
+  return ,$values
+}
+
+function New-SqlPassword {
+  $bytes = New-Object byte[] 24
+  $generator = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  try {
+    $generator.GetBytes($bytes)
+  }
+  finally {
+    $generator.Dispose()
+  }
+  return "R!a7$([Convert]::ToBase64String($bytes).TrimEnd('='))"
 }
 
 Require-Command 'git'
@@ -35,6 +65,18 @@ if ($appVersion -notmatch '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$') {
 }
 Write-Host "Application version: $appVersion" -ForegroundColor Cyan
 
+$envPath = Join-Path $repoRoot '.env'
+$envValues = Read-EnvValues $envPath
+if (-not $PSBoundParameters.ContainsKey('SqlServer')) {
+  $SqlServer = if ($envValues.ContainsKey('DB_SERVER') -and $envValues.DB_SERVER) { $envValues.DB_SERVER } else { 'localhost' }
+}
+if (-not $PSBoundParameters.ContainsKey('Database')) {
+  $Database = if ($envValues.ContainsKey('DB_DATABASE') -and $envValues.DB_DATABASE) { $envValues.DB_DATABASE } else { 'COSEC' }
+}
+if (-not $PSBoundParameters.ContainsKey('ReadUser')) {
+  $ReadUser = if ($envValues.ContainsKey('DOCKER_DB_USER') -and $envValues.DOCKER_DB_USER) { $envValues.DOCKER_DB_USER } else { 'tc_attendance_reader' }
+}
+
 Require-Command 'node'
 & node scripts/generate-changelog.mjs
 if ($LASTEXITCODE -ne 0) {
@@ -53,19 +95,7 @@ $envPath = Join-Path $repoRoot '.env'
 if (-not (Test-Path $envPath)) {
   Require-Command 'sqlcmd'
 
-  $securePassword = Read-Host "Enter the SQL password for $ReadUser" -AsSecureString
-  $readPassword = [System.Net.NetworkCredential]::new('', $securePassword).Password
-  $confirmSecurePassword = Read-Host 'Confirm the SQL password' -AsSecureString
-  $confirmPassword = [System.Net.NetworkCredential]::new('', $confirmSecurePassword).Password
-
-  if ([string]::IsNullOrWhiteSpace($readPassword)) {
-    throw 'SQL password cannot be empty.'
-  }
-
-  if ($readPassword -cne $confirmPassword) {
-    throw 'SQL passwords do not match.'
-  }
-
+  $readPassword = New-SqlPassword
   $sqlPassword = $readPassword.Replace("'", "''")
   $sql = @'
 IF NOT EXISTS (SELECT 1 FROM sys.server_principals WHERE name = N'$(SqlUser)')
@@ -75,7 +105,8 @@ BEGIN
 END
 ELSE
 BEGIN
-  PRINT 'SQL login already exists.';
+  ALTER LOGIN [$(SqlUser)] WITH PASSWORD = N'$(SqlPassword)';
+  PRINT 'Reset SQL login password.';
 END;
 
 USE [$(SqlDatabase)];
@@ -116,10 +147,16 @@ END;
   Copy-Item (Join-Path $repoRoot '.env.example') $envPath
   $envPassword = $readPassword.Replace('"', '\"')
   Add-Content -Path $envPath -Value "`nDOCKER_DB_USER=$ReadUser`nDOCKER_DB_PASSWORD=`"$envPassword`""
-  Write-Host "Created .env with Docker SQL credentials for $ReadUser." -ForegroundColor Green
+  Write-Host "Created .env with generated Docker SQL credentials for $ReadUser." -ForegroundColor Green
 }
 else {
-  Write-Host '.env already installed; leaving it unchanged.' -ForegroundColor Yellow
+  if (-not $envValues.ContainsKey('DOCKER_DB_USER') -or [string]::IsNullOrWhiteSpace($envValues.DOCKER_DB_USER)) {
+    throw '.env must define DOCKER_DB_USER.'
+  }
+  if (-not $envValues.ContainsKey('DOCKER_DB_PASSWORD') -or [string]::IsNullOrWhiteSpace($envValues.DOCKER_DB_PASSWORD)) {
+    throw '.env must define DOCKER_DB_PASSWORD.'
+  }
+  Write-Host '.env already installed; leaving its credentials unchanged.' -ForegroundColor Yellow
 }
 
 Require-Command 'docker'
