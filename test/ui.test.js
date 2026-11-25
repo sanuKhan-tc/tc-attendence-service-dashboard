@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accessSourceKind, buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatAccessSource, formatDateRange, formatDurationBetween, formatTableDateRange, formatTime, getOverviewDateRange, isOverviewMetricFlagged, isOverviewRowCritical, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatDurationBetween, formatTableDateRange, formatTime, getOverviewDateRange, isOverviewMetricFlagged, isOverviewRowCritical, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -26,17 +26,6 @@ test('limits overview red metric and row highlights to single-day flags', () => 
   assert.equal(isOverviewRowCritical(row, false), true);
   assert.equal(isOverviewMetricFlagged(row, 'firstIn', true), false);
   assert.equal(isOverviewRowCritical(row, true), false);
-});
-
-test('formats first-in and last-out punch sources', () => {
-  assert.equal(formatAccessSource('Face ID', 'Door Access'), 'In: Face ID · Out: Door Access');
-  assert.equal(formatAccessSource('Face ID', null), 'In: Face ID · Out: —');
-});
-
-test('classifies punch sources for colored pills', () => {
-  assert.equal(accessSourceKind('Door Access'), 'door-access');
-  assert.equal(accessSourceKind('Face ID'), 'face-id');
-  assert.equal(accessSourceKind(null), 'unknown');
 });
 
 test('filters by location, employee search, and report tab', () => {

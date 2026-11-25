@@ -22,16 +22,6 @@ export function isOverviewRowCritical(row, isDateRange) {
   return !isDateRange && Boolean(row.late && row.early && row.underEight);
 }
 
-export function formatAccessSource(firstInSource, lastOutSource) {
-  return `In: ${firstInSource || '—'} · Out: ${lastOutSource || '—'}`;
-}
-
-export function accessSourceKind(source) {
-  if (String(source || '').toLowerCase() === 'door access') return 'door-access';
-  if (String(source || '').toLowerCase() === 'face id') return 'face-id';
-  return 'unknown';
-}
-
 export function presentDaysLabel(rows) {
   return rows.length ? String(rows.length) : 'No records';
 }

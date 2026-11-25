@@ -2,11 +2,6 @@ const MINUTES_PER_DAY = 24 * 60;
 
 export const BIOMETRIC_DEVICES = [
   { mid: 15, name: 'TA-tc Dubai-Device-1', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00' },
-  { mid: 5, name: 'Main Door -114', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00', fallbackFor: 15 },
-  { mid: 6, name: 'Main Door-113', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00', fallbackFor: 15 },
-  { mid: 7, name: 'Main Door-214', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00', fallbackFor: 15 },
-  { mid: 9, name: 'Main Door -116', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00', fallbackFor: 15 },
-  { mid: 1, name: 'Panel200-Device-1', location: 'Dubai', lateCutoff: '08:30', officeEnd: '17:00', fallbackFor: 15 },
   { mid: 12, name: 'TC-Hyderabad', location: 'India - Hyderabad', lateCutoff: '10:00', officeEnd: '18:30' },
   { mid: 13, name: 'TC-Noida', location: 'India - Noida', lateCutoff: '10:00', officeEnd: '18:30' },
   { mid: 16, name: 'TC- Chennai', location: 'India - Chennai', lateCutoff: '10:30', officeEnd: '19:00' },
@@ -61,9 +56,7 @@ function normalizeRows(rows) {
       grouped.set(key, {
         ...row,
         firstIn,
-        firstInSource: row.firstInSource ?? null,
         lastEvent: initialLastEvent ? dateValue(initialLastEvent) : null,
-        lastOutSource: row.lastOutSource ?? null,
       });
       continue;
     }
@@ -72,12 +65,10 @@ function normalizeRows(rows) {
       current.firstIn = firstIn;
       current.location = row.location;
       current.deviceName = row.deviceName;
-      current.firstInSource = row.firstInSource ?? null;
     }
     const rowLastEvent = row.lastEventTime ?? row.lastEvent ?? row.eventTime;
     if (rowLastEvent && (!current.lastEvent || dateValue(rowLastEvent) > current.lastEvent)) {
       current.lastEvent = dateValue(rowLastEvent);
-      current.lastOutSource = row.lastOutSource ?? null;
     }
     if (row.workTime != null) current.workTime = row.workTime;
     if (row.netWorkTime != null) current.netWorkTime = row.netWorkTime;
@@ -108,9 +99,7 @@ export function buildAttendanceReport(rows) {
       location: row.location,
       date: firstIn.toISOString().slice(0, 10),
       firstIn: firstIn.toISOString(),
-      firstInSource: row.firstInSource,
       lastOut: lastOut?.toISOString() ?? null,
-      lastOutSource: lastOut ? row.lastOutSource : null,
       lastOutLabel: lastOut ? lastOut.toISOString() : 'In office',
       recordedMinutes,
       recordedTime: formatMinutes(recordedMinutes),
@@ -152,9 +141,7 @@ export function buildConsolidatedReport(rows) {
       employee: row.employee || row.fullName || row.userId,
       location: row.location,
       firstIn: firstIn?.toISOString() ?? null,
-      firstInSource: row.firstInSource ?? null,
       lastOut: lastOut?.toISOString() ?? null,
-      lastOutSource: lastOut ? (row.lastOutSource ?? null) : null,
       lateCount,
       earlyCount,
       underEightCount,

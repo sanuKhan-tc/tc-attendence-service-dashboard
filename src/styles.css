@@ -640,67 +640,6 @@ tbody tr:hover .employee-cell b {
   font-weight: 700;
 }
 
-.access-source-list,
-.access-source-legend,
-.access-source-legend > span {
-  display: inline-flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.access-source-list {
-  min-width: 142px;
-}
-
-.access-direction-pill {
-  font-size: 10px;
-  letter-spacing: 0.04em;
-}
-
-.access-source-separator {
-  color: var(--tc-text-muted);
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.access-pill {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 800;
-  line-height: 1;
-  white-space: nowrap;
-}
-
-.access-pill.door-access {
-  background: #e8faf4;
-  border-color: #bcebdc;
-  color: #0e7255;
-}
-
-.access-pill.face-id {
-  background: var(--tc-indigo-soft);
-  border-color: #d7d7f0;
-  color: var(--tc-indigo);
-}
-
-.access-pill.unknown {
-  background: #f3f4f8;
-  border-color: var(--tc-border);
-  color: var(--tc-text-muted);
-}
-
-.access-source-legend {
-  color: var(--tc-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .in-office {
   display: inline-flex;
   align-items: center;

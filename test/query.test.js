@@ -21,13 +21,8 @@ test('builds a read-only biometric attendance query for the hard-coded devices',
   assert.match(normalized, /@LOCATION = N'INDIA' AND R\.LOCATION LIKE N'INDIA%'/);
   assert.match(normalized, /CONVERT\(TIME, PUNCHES\.FIRSTIN\) > M\.LATECUTOFF/);
   assert.match(normalized, /CONVERT\(TIME, PUNCHES\.LASTEVENT\) < M\.OFFICEEND/);
-  assert.match(normalized, /DEVICEMAP \(MID, LOCATION, LATECUTOFF, OFFICEEND, ACCESSTYPE\)/);
-  assert.match(normalized, /N'FACE ID'/);
-  assert.match(normalized, /N'DOOR ACCESS'/);
-  assert.match(normalized, /FIRSTINSOURCE/);
-  assert.match(normalized, /LASTOUTSOURCE/);
-  assert.match(normalized, /V\.MID NOT IN \(5, 6, 7, 9, 1\)/);
-  assert.match(normalized, /PRIMARYPUNCHES\.MID IN \(15\)/);
+  assert.match(normalized, /DEVICEMAP \(MID, LOCATION, LATECUTOFF, OFFICEEND\)/);
+  assert.doesNotMatch(normalized, /ACCESSTYPE|FIRSTINSOURCE|LASTOUTSOURCE|DOOR ACCESS|FALLBACK/);
   for (const device of BIOMETRIC_DEVICES) assert.match(normalized, new RegExp(`\\(${device.mid},`));
   assert.doesNotMatch(normalized, /\b(INSERT|UPDATE|DELETE|MERGE|ALTER|DROP|TRUNCATE)\b/);
 });

@@ -5,7 +5,6 @@ import {
   dataSourceLabel,
   filterAttendanceRows,
   filterEmployeeOptions,
-  accessSourceKind,
   formatDurationBetween,
   formatTableDateRange,
   formatTime,
@@ -105,30 +104,6 @@ function statusClassName(status) {
 
 function formatEmployeeLabel(user) {
   return `${user.employee} · ${user.userId}`;
-}
-
-function AccessSourcePill({ source }) {
-  return <span className={`access-pill ${accessSourceKind(source)}`}>{source || '—'}</span>;
-}
-
-function PunchSourceCell({ firstInSource, lastOutSource }) {
-  return (
-    <div className="access-source-list">
-      <span className={`access-pill access-direction-pill ${accessSourceKind(firstInSource)}`}>IN</span>
-      <span className="access-source-separator" aria-hidden="true">-</span>
-      <span className={`access-pill access-direction-pill ${accessSourceKind(lastOutSource)}`}>OUT</span>
-    </div>
-  );
-}
-
-function PunchSourceLegend() {
-  return (
-    <span className="access-source-legend" aria-label="Punch source legend">
-      <span>Punch source:</span>
-      <span><AccessSourcePill source="Door Access" /> Door Access</span>
-      <span><AccessSourcePill source="Face ID" /> Face ID</span>
-    </span>
-  );
 }
 
 function Spinner({ light = false, size = 15 }) {
@@ -255,7 +230,7 @@ function SummaryCardsSkeleton() {
   );
 }
 
-function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true, showDuration = false, showSource = false, showStatus = true }) {
+function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, showTimes = true, showDuration = false, showStatus = true }) {
   return Array.from({ length: rows }, (_, index) => (
     <tr className="skeleton-row" key={index} aria-hidden="true">
       <td>
@@ -281,7 +256,6 @@ function TableRowsSkeleton({ rows = 6, showEmployee = true, showDate = false, sh
       )}
       {showDuration && <td><span className="skeleton skeleton-line w-64" /></td>}
       {!showEmployee && <td><span className="skeleton skeleton-line w-64" /></td>}
-      {showSource && <td><span className="skeleton skeleton-line w-110" /></td>}
       {showStatus && <td><span className="skeleton skeleton-pill w-110" /></td>}
     </tr>
   ));
@@ -565,7 +539,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
-  const columnCount = isDateRange ? 4 : 7;
+  const columnCount = isDateRange ? 4 : 6;
   const hasTableFilters = location !== 'All' || Boolean(search) || tab !== 'all';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
@@ -626,8 +600,8 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
       <section className="flagged-card">
         <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th><th>Punch source</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody>
-          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showSource={!isDateRange} showStatus={isDateRange} />}
+        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody>
+          {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showStatus={isDateRange} />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
           {state === 'ready' && visibleRows.map((row) => <tr className={`clickable-table-row${isOverviewRowCritical(row, isDateRange) ? ' flagged-row-critical' : ''}`} key={row.userId} onClick={() => onSelectUser(row.userId)}>
             <td><button className="employee-cell employee-button" type="button" onClick={(event) => { event.stopPropagation(); onSelectUser(row.userId); }}><span className="avatar">{initials(row.employee)}</span><span><b>{row.employee}</b><small>{row.userId}</small></span></button></td>
@@ -640,12 +614,11 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
                 <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'totalHours', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatDurationBetween(row.firstIn, row.lastOut)}</span></td>
               </>
             )}
-            {!isDateRange && <td><PunchSourceCell firstInSource={row.firstInSource} lastOutSource={row.lastOutSource} /></td>}
             {isDateRange && <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status, row, true)}</span>)}</div></td>}
           </tr>)}
           {state === 'ready' && visibleRows.length === 0 && <tr><td colSpan={columnCount} className="table-message"><div className="table-empty"><span className="table-empty-icon" aria-hidden="true">✓</span><strong>No flagged staff found</strong><span>{hasTableFilters ? 'Try clearing a filter or choosing another date.' : 'No attendance exceptions were found for this selection.'}</span>{hasTableFilters && <button type="button" className="table-empty-action" onClick={resetFilters}>Clear table filters</button>}</div></td></tr>}
         </tbody></table></div>
-        <footer className="table-footer">{isLoading ? <span>Loading attendance records…</span> : <>{!isDateRange && <PunchSourceLegend />}<span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
+        <footer className="table-footer">{isLoading ? <span>Loading attendance records…</span> : <><span>Showing {visibleRows.length} flagged employees · {pagination.total} records · Page {pagination.page} of {pagination.totalPages}</span><span className="pagination-controls"><button type="button" onClick={() => setPage(pagination.page - 1)} disabled={pagination.page <= 1}>Previous</button><button type="button" onClick={() => setPage(pagination.page + 1)} disabled={pagination.page >= pagination.totalPages}>Next</button></span></>}</footer>
       </section>
     </>
   );
@@ -806,8 +779,8 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <ChartsSkeleton />
             <div className="table-wrap history-table">
               <table>
-                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Punch source</th><th>Status</th></tr></thead>
-                <tbody><TableRowsSkeleton rows={5} showEmployee={false} showSource /></tbody>
+                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
+                <tbody><TableRowsSkeleton rows={5} showEmployee={false} /></tbody>
               </table>
             </div>
           </>
@@ -820,7 +793,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <HistoryCharts rows={visibleHistory} />
             <div className="table-wrap history-table">
               <table>
-                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Punch source</th><th>Status</th></tr></thead>
+                <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
                 <tbody>
                   {pagedHistory.rows.map((row) => (
                     <tr key={`${row.userId}-${row.date}`}>
@@ -829,16 +802,14 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                       <td className="num-cell">{formatTime(row.firstIn)}</td>
                       <td className="num-cell">{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">In office</span>}</td>
                       <td className="num-cell">{row.recordedTime}</td>
-                      <td><PunchSourceCell firstInSource={row.firstInSource} lastOutSource={row.lastOutSource} /></td>
                       <td><div className="status-list">{row.status.map((status) => <span className={statusClassName(status)} key={status}>{statusLabel(status)}</span>)}</div></td>
                     </tr>
                   ))}
-                  {pagedHistory.total === 0 && <tr><td colSpan="7" className="table-message">No attendance history for this employee and date range.</td></tr>}
+                  {pagedHistory.total === 0 && <tr><td colSpan="6" className="table-message">No attendance history for this employee and date range.</td></tr>}
                 </tbody>
               </table>
             </div>
             <footer className="table-footer">
-              <PunchSourceLegend />
               <span>
                 {pagedHistory.total
                   ? `Showing ${pagedHistory.rows.length} of ${pagedHistory.total} records (${presentDaysLabel(visibleHistory)} present days) · Page ${pagedHistory.page} of ${pagedHistory.totalPages}`
