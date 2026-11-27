@@ -203,12 +203,22 @@ h4 {
   flex-direction: column;
 }
 
+.login-layout {
+  background: radial-gradient(ellipse at 50% 0%, var(--tc-green-soft), var(--tc-bg) 58%);
+}
+
 .login-screen {
   min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 24px;
   background: radial-gradient(ellipse at 50% 0%, var(--tc-green-soft), var(--tc-bg) 58%);
+}
+
+.login-layout .login-screen {
+  min-height: 0;
+  flex: 1;
+  background: transparent;
 }
 
 .login-card {

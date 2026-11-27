@@ -481,3 +481,14 @@ test('uses EmployeeCombobox for employee search on the overview page and loads u
   assert.match(app, /page !== 'dashboard' && page !== 'user-report'/);
   assert.match(app, /<DashboardPage[\s\S]*?userOptions=\{userOptions\}[\s\S]*?usersLoading=\{usersLoading\}/);
 });
+
+test('renders the shared SiteFooter on both the dashboard and login page', () => {
+  const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+
+  assert.match(app, /function SiteFooter\(/);
+  assert.match(app, /<SiteFooter page=\{page\} \/>/);
+  assert.match(app, /function LoginScreen[\s\S]*?className="app-layout login-layout"[\s\S]*?<SiteFooter\b/);
+  assert.match(css, /\.login-layout\s*\{/);
+  assert.match(css, /\.login-layout \.login-screen\s*\{/);
+});

@@ -1285,8 +1285,16 @@ function App() {
           ) : <ChangelogPage />}
         </div>
       </main>
-      <footer className="site-footer">
-        <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
+      <SiteFooter page={page} />
+    </div>
+  );
+}
+
+function SiteFooter({ page = '', showChangelogLink = true }) {
+  return (
+    <footer className="site-footer">
+      <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
+      {showChangelogLink ? (
         <a
           className={page === 'changelog' ? 'footer-version active' : 'footer-version'}
           href="#changelog"
@@ -1294,8 +1302,10 @@ function App() {
         >
           v{APP_VERSION}
         </a>
-      </footer>
-    </div>
+      ) : (
+        <span className="footer-version">v{APP_VERSION}</span>
+      )}
+    </footer>
   );
 }
 
@@ -1312,14 +1322,21 @@ function LoginScreen({ onLogin }) {
     } catch (loginError) { setError(loginError.message || 'Unable to sign in.'); }
     finally { setBusy(false); }
   }
-  return <main className="login-screen"><form className="login-card" onSubmit={submit}>
-    <img src="/techcarrot-logo.svg" alt="techcarrot" width="136" />
-    <span className="hero-eyebrow">Attendance portal</span><h1>Welcome back</h1><p>Sign in to view attendance insights.</p>
-    <label className="login-field">Username<input name="username" autoComplete="username" required autoFocus /></label>
-    <label className="login-field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
-    {error && <p className="login-error" role="alert">{error}</p>}
-    <button className="primary-button" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-  </form></main>;
+  return (
+    <div className="app-layout login-layout">
+      <main className="login-screen">
+        <form className="login-card" onSubmit={submit}>
+          <img src="/techcarrot-logo.svg" alt="techcarrot" width="136" />
+          <span className="hero-eyebrow">Attendance portal</span><h1>Welcome back</h1><p>Sign in to view attendance insights.</p>
+          <label className="login-field">Username<input name="username" autoComplete="username" required autoFocus /></label>
+          <label className="login-field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button className="primary-button" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        </form>
+      </main>
+      <SiteFooter showChangelogLink={false} />
+    </div>
+  );
 }
 
 export default App;
