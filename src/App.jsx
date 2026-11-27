@@ -600,7 +600,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
       <section className="flagged-card">
         <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
         <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody>
+        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody className="content-fade" key={`${tab}-${pagination.page}-${state}`}>
           {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showStatus={isDateRange} />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
           {state === 'ready' && visibleRows.map((row) => <tr className={`clickable-table-row${isOverviewRowCritical(row, isDateRange) ? ' flagged-row-critical' : ''}`} key={row.userId} onClick={() => onSelectUser(row.userId)}>
@@ -694,7 +694,7 @@ const AttendanceCalendar = memo(function AttendanceCalendar({ rows, month, setMo
         <label><span>Month</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label>
       </div>
       <div className="calendar-grid calendar-weekdays">{DAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
-      <div className="calendar-grid calendar-days">{cells.map((cell, index) => <div className={cell.date ? `calendar-day ${cell.row ? 'has-attendance' : ''}` : 'calendar-day empty'} key={cell.date || `empty-${index}`}>
+      <div className="calendar-grid calendar-days content-fade" key={month}>{cells.map((cell, index) => <div className={cell.date ? `calendar-day ${cell.row ? 'has-attendance' : ''}` : 'calendar-day empty'} key={cell.date || `empty-${index}`}>
         {cell.date && <><b>{Number(cell.date.slice(-2))}</b>{cell.row && <><span className={cell.row.status.length ? 'calendar-dot flagged' : 'calendar-dot'} /><small>{cell.row.lastOut ? formatTime(cell.row.firstIn) : 'In office'}</small></>}</>}
       </div>)}</div>
       <div className="calendar-legend"><span><i className="calendar-dot" />Recorded attendance</span><span><i className="calendar-dot flagged" />Flagged attendance</span></div>
@@ -787,14 +787,14 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
         )}
         {historyState === 'error' && <p className="history-message error-message">{historyError}</p>}
         {historyState === 'ready' && (
-          <>
+          <div className="content-rise">
             <SummaryCards summary={visibleSummary} presentDaysRows={visibleHistory} />
             <AttendanceCalendar rows={visibleHistory} month={calendarMonth} setMonth={setCalendarMonth} />
             <HistoryCharts rows={visibleHistory} />
             <div className="table-wrap history-table">
               <table>
                 <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
-                <tbody>
+                <tbody className="content-fade" key={pagedHistory.page}>
                   {pagedHistory.rows.map((row) => (
                     <tr key={`${row.userId}-${row.date}`}>
                       <td className="num-cell">{row.date}</td>
@@ -822,7 +822,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                 </span>
               )}
             </footer>
-          </>
+          </div>
         )}
       </section>
     </>
@@ -856,7 +856,7 @@ function ChangelogPage() {
         </div>
         <span className="meta-pill meta-date">v{APP_VERSION}</span>
       </div>
-      <div className="changelog-list">
+      <div className={state === 'ready' ? 'changelog-list content-fade' : 'changelog-list'}>
         {state === 'loading' && <p className="changelog-message">Loading changelog…</p>}
         {state === 'error' && <p className="changelog-message error-message">Unable to load changelog.</p>}
         {state === 'ready' && entries.length === 0 && <p className="changelog-message">No changelog entries available.</p>}
@@ -1167,54 +1167,56 @@ function App() {
       <Navigation page={page} dataSource={DATA_SOURCE_LABEL} />
       <button className="logout-button" onClick={async () => { await fetch('/api/logout', { method: 'POST' }); setAuthenticated(false); }}>Sign out</button>
       <main className="app-shell">
-        {page === 'dashboard' ? (
-          <DashboardPage
-            datePreset={datePreset}
-            setDatePreset={setDatePreset}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            location={location}
-            setLocation={setLocation}
-            search={search}
-            setSearch={setSearch}
-            tab={tab}
-            setTab={setTab}
-            report={report}
-            state={state}
-            error={error}
-            onSelectUser={openUserReport}
-            resetFilters={resetFilters}
-            pagination={pagination}
-            setPage={setPageNumber}
-            onExport={exportOverview}
-            isExporting={isExporting}
-            exportError={exportError}
-            onPresetChange={onPresetChange}
-          />
-        ) : page === 'user-report' ? (
-          <UserReportPage
-            userOptions={userOptions}
-            usersLoading={usersLoading}
-            selectedUserId={selectedUserId}
-            setSelectedUserId={setSelectedUserId}
-            historyPreset={historyPreset}
-            setHistoryPreset={setHistoryPreset}
-            historyFrom={historyFrom}
-            setHistoryFrom={setHistoryFrom}
-            historyTo={historyTo}
-            setHistoryTo={setHistoryTo}
-            onHistoryPresetChange={onHistoryPresetChange}
-            loadUserHistory={loadUserHistory}
-            resetHistoryFilters={resetHistoryFilters}
-            history={history}
-            historyState={historyState}
-            historyError={historyError}
-            calendarMonth={calendarMonth || (historyTo || endDate || startDate || '2026-01').slice(0, 7)}
-            setCalendarMonth={setCalendarMonth}
-          />
-        ) : <ChangelogPage />}
+        <div className="page-transition" key={page}>
+          {page === 'dashboard' ? (
+            <DashboardPage
+              datePreset={datePreset}
+              setDatePreset={setDatePreset}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              location={location}
+              setLocation={setLocation}
+              search={search}
+              setSearch={setSearch}
+              tab={tab}
+              setTab={setTab}
+              report={report}
+              state={state}
+              error={error}
+              onSelectUser={openUserReport}
+              resetFilters={resetFilters}
+              pagination={pagination}
+              setPage={setPageNumber}
+              onExport={exportOverview}
+              isExporting={isExporting}
+              exportError={exportError}
+              onPresetChange={onPresetChange}
+            />
+          ) : page === 'user-report' ? (
+            <UserReportPage
+              userOptions={userOptions}
+              usersLoading={usersLoading}
+              selectedUserId={selectedUserId}
+              setSelectedUserId={setSelectedUserId}
+              historyPreset={historyPreset}
+              setHistoryPreset={setHistoryPreset}
+              historyFrom={historyFrom}
+              setHistoryFrom={setHistoryFrom}
+              historyTo={historyTo}
+              setHistoryTo={setHistoryTo}
+              onHistoryPresetChange={onHistoryPresetChange}
+              loadUserHistory={loadUserHistory}
+              resetHistoryFilters={resetHistoryFilters}
+              history={history}
+              historyState={historyState}
+              historyError={historyError}
+              calendarMonth={calendarMonth || (historyTo || endDate || startDate || '2026-01').slice(0, 7)}
+              setCalendarMonth={setCalendarMonth}
+            />
+          ) : <ChangelogPage />}
+        </div>
       </main>
       <footer className="site-footer">
         <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
