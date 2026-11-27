@@ -331,3 +331,43 @@ test('lets .login-card h1 scale down with mobile heading rules', () => {
 
   assert.doesNotMatch(desktopLoginH1, /font-size\s*:/i, '.login-card h1 should inherit h1, h2 sizing so @media (max-width: 560px) scales it');
 });
+
+test('styles the three overview KPI cards with the three brand colors, bottom-bordered filter card, and compact icon-bg-free layout', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { rules, propHex } = parseTopLevelCss(css);
+
+  const overviewAccents = new Set([
+    propHex('.late-card', '--accent').toLowerCase(),
+    propHex('.early-card', '--accent').toLowerCase(),
+    propHex('.hours-card', '--accent').toLowerCase(),
+  ]);
+  assert.deepEqual(
+    [...overviewAccents].sort(),
+    ['#2b2b6b', '#2c5b32', '#e74c2d'],
+    'The three overview KPI cards should use the three brand theme colors (#E74C2D, #2B2B6B, #2C5B32)',
+  );
+
+  const filterCard = rules.get('.filter-card') ?? '';
+  assert.match(filterCard, /border-bottom:\s*3px\s+solid\s+var\(--tc-(?:green|blue|saffron)\);/i);
+
+  const summaryCard = rules.get('.summary-card') ?? '';
+  assert.doesNotMatch(summaryCard, /min-height\s*:/i, '.summary-card should not force excess vertical negative space via min-height');
+  assert.match(summaryCard, /display:\s*grid;/i);
+  assert.match(summaryCard, /grid-template-columns:\s*1fr\s+auto;/i);
+
+  const summaryIcon = rules.get('.summary-icon') ?? '';
+  assert.match(summaryIcon, /background:\s*transparent;/i);
+  assert.doesNotMatch(summaryIcon, /var\(--accent-bg\)/i);
+
+  const summaryHeading = rules.get('.summary-heading') ?? '';
+  assert.match(summaryHeading, /font-size:\s*18px;/);
+  assert.match(summaryHeading, /font-weight:\s*700;/);
+
+  const summaryValue = rules.get('.summary-card strong') ?? '';
+  assert.match(summaryValue, /margin-top:\s*0;/);
+  assert.match(summaryValue, /font-size:\s*28px;/);
+
+  const summaryCaption = rules.get('.summary-card small') ?? '';
+  assert.match(summaryCaption, /grid-column:\s*1\s*\/\s*-1;/);
+  assert.match(summaryCaption, /margin-top:\s*0;/);
+});
