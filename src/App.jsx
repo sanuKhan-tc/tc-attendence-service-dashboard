@@ -610,7 +610,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
             {!isDateRange && (
               <>
                 <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'firstIn', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatTime(row.firstIn)}</span></td>
-                <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'lastOut', isDateRange) ? ' metric-pill-alert' : ''}`}>{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</span></td>
+                <td className="num-cell">{row.lastOut ? <span className={`metric-pill${isOverviewMetricFlagged(row, 'lastOut', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatTime(row.lastOut)}</span> : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</td>
                 <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'totalHours', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatDurationBetween(row.firstIn, row.lastOut)}</span></td>
               </>
             )}

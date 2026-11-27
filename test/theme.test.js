@@ -186,7 +186,8 @@ test('maps typography hierarchy sizes and interactive brand color roles', () => 
   assert.match(secondaryBtn, /var\(--tc-blue\)/);
 
   const activeNav = ruleBody('.nav-link.active');
-  assert.match(activeNav, /var\(--tc-green\)/);
+  assert.match(activeNav, /border-bottom-color:\s*var\(--tc-saffron\);/);
+  assert.match(activeNav, /color:\s*var\(--tc-green\);/);
 
   const activeTab = ruleBody('.tab.active');
   assert.match(activeTab, /background:\s*var\(--tc-green\);/);
@@ -371,4 +372,17 @@ test('styles the three overview KPI cards with the three brand colors, saffron s
   const summaryCaption = rules.get('.summary-card small') ?? '';
   assert.match(summaryCaption, /grid-column:\s*1\s*\/\s*-1;/);
   assert.match(summaryCaption, /margin-top:\s*0;/);
+});
+
+test('renders the Not logged out / In office pill without a gray metric-pill wrapper', () => {
+  const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
+  assert.doesNotMatch(
+    app,
+    /className=\{`metric-pill[^`]*`\}[^>]*>[^<]*\{row\.lastOut \? [^}]+<span className="in-office">/,
+    'In office / Not logged out pill should not be nested inside a gray .metric-pill wrapper',
+  );
+  assert.match(
+    app,
+    /row\.lastOut \? \(?\s*<span className=\{`metric-pill/,
+  );
 });
