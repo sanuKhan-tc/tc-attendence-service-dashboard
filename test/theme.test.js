@@ -472,3 +472,12 @@ test('uses neutral tabbed table header, dim saffron late icon bg, uniform rounde
   assert.match(rules.get('.skeleton-avatar') ?? '', /border-radius:\s*10px;/);
   assert.doesNotMatch(css, /border-radius:\s*0\s+\d+px\s+0\s+\d+px;/, 'No asymmetric sharp-corner card/avatar radii should remain');
 });
+
+test('uses EmployeeCombobox for employee search on the overview page and loads users for dashboard', () => {
+  const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
+
+  assert.doesNotMatch(app, /<label className="employee-filter">/);
+  assert.match(app, /<div className="control-field employee-filter">[\s\S]*?<EmployeeCombobox[\s\S]*?onQueryChange=\{setSearch\}/);
+  assert.match(app, /page !== 'dashboard' && page !== 'user-report'/);
+  assert.match(app, /<DashboardPage[\s\S]*?userOptions=\{userOptions\}[\s\S]*?usersLoading=\{usersLoading\}/);
+});

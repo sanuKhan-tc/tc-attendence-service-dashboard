@@ -379,7 +379,7 @@ const SummaryCards = memo(function SummaryCards({ summary, presentDaysRows }) {
   );
 });
 
-const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
+const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserId, onSelect, onQueryChange, loading, listId = 'employee-combobox-list' }) {
   const containerRef = useRef(null);
   const listRef = useRef(null);
   const selectedUser = useMemo(
@@ -392,8 +392,12 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
+    if (onQueryChange) {
+      if (!selectedUserId) setQuery('');
+      return;
+    }
     setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
-  }, [selectedUser]);
+  }, [onQueryChange, selectedUser, selectedUserId]);
 
   const filteredOptions = useMemo(() => {
     if (selectedUser && deferredQuery === formatEmployeeLabel(selectedUser)) {
@@ -410,12 +414,14 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
     function handleOutsideClick(event) {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
         setOpen(false);
-        setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+        if (!onQueryChange) {
+          setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+        }
       }
     }
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [selectedUser]);
+  }, [onQueryChange, selectedUser]);
 
   useEffect(() => {
     if (!open || !listRef.current) return;
@@ -455,7 +461,9 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
       selectOption(filteredOptions[activeIndex]);
     } else if (event.key === 'Escape') {
       setOpen(false);
-      setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+      if (!onQueryChange) {
+        setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+      }
     }
   }
 
@@ -468,9 +476,9 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
           type="text"
           role="combobox"
           aria-expanded={open}
-          aria-controls="employee-combobox-list"
+          aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={activeOption ? `employee-opt-${activeOption.userId}` : undefined}
+          aria-activedescendant={activeOption ? `${listId}-opt-${activeOption.userId}` : undefined}
           aria-label="Employee"
           placeholder={loading ? 'Loading employees…' : 'Search employee by name or ID'}
           value={query}
@@ -479,7 +487,9 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
             const nextValue = event.target.value;
             setQuery(nextValue);
             setOpen(true);
-            if (!nextValue.trim()) {
+            if (onQueryChange) {
+              onQueryChange(nextValue);
+            } else if (!nextValue.trim()) {
               onSelect('');
             }
           }}
@@ -515,7 +525,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
       </div>
 
       {open && (
-        <div className="combobox-popover" id="employee-combobox-list" role="listbox" ref={listRef}>
+        <div className="combobox-popover" id={listId} role="listbox" ref={listRef}>
           {loading ? (
             <div className="combobox-loading" aria-busy="true">
               <div className="combobox-loading-header">
@@ -539,7 +549,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
               return (
                 <button
                   key={user.userId}
-                  id={`employee-opt-${user.userId}`}
+                  id={`${listId}-opt-${user.userId}`}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
@@ -570,7 +580,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   );
 });
 
-function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange }) {
+function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange, userOptions, usersLoading }) {
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
@@ -623,10 +633,17 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
             {isLoading && <span className="field-loader" aria-hidden="true"><Spinner size={14} /></span>}
           </div>
         </label>
-        <label className="employee-filter">
-          <span>Employee</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or employee ID" />
-        </label>
+        <div className="control-field employee-filter">
+          <span className="field-label">Employee</span>
+          <EmployeeCombobox
+            options={userOptions}
+            selectedUserId={search}
+            onSelect={setSearch}
+            onQueryChange={setSearch}
+            loading={usersLoading}
+            listId="overview-employee-combobox-list"
+          />
+        </div>
         <button className="icon-reset-button" type="button" onClick={resetFilters} title="Reset filters" aria-label="Reset filters"><ResetIcon /></button>
       </section>
 
@@ -969,9 +986,9 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  // Lazy-load /api/attendance/users only when User Reports is opened, with AbortController
+  // Lazy-load /api/attendance/users for Overview and User Reports employee comboboxes, with AbortController
   useEffect(() => {
-    if (!authenticated || page !== 'user-report' || usersLoadedRef.current) return undefined;
+    if (!authenticated || (page !== 'dashboard' && page !== 'user-report') || usersLoadedRef.current) return undefined;
 
     const controller = new AbortController();
     setUsersLoading(true);
@@ -1241,6 +1258,8 @@ function App() {
               isExporting={isExporting}
               exportError={exportError}
               onPresetChange={onPresetChange}
+              userOptions={userOptions}
+              usersLoading={usersLoading}
             />
           ) : page === 'user-report' ? (
             <UserReportPage

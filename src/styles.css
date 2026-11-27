@@ -507,7 +507,7 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(44, 91, 50, 0.16);
 }
 
-.employee-filter { flex: 1; }
+.employee-filter { flex: 1; min-width: 240px; }
 .employee-filter input { width: 100%; }
 
 /* Pill Buttons */
