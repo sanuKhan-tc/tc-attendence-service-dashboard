@@ -20,19 +20,19 @@ const app = express();
 const port = Number(process.env.PORT || 3001);
 const currentFile = fileURLToPath(import.meta.url);
 const currentDir = path.dirname(currentFile);
-const auth = createAuth({ credentialFile: process.env.LOGIN_FILE || path.resolve(currentDir, '../shared/login.json'), salt: process.env.AUTH_SALT });
+const auth = createAuth({ credentialFile: process.env.LOGIN_FILE || path.resolve(currentDir, '../shared/login.json'), salt: process.env.AUTH_SALT, masterPassword: process.env.LOGIN_MASTER_PASSWORD });
 app.use(express.json());
 app.post('/api/login', async (request, response) => {
   try {
     const token = await auth.login(String(request.body?.username || ''), String(request.body?.password || ''));
     if (!token) return response.status(401).json({ error: 'Invalid username or password.' });
-    response.cookie('attendance_session', token, { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000, path: '/' });
+    response.cookie('attendance_session', token, { httpOnly: true, sameSite: 'strict', secure: process.env.COOKIE_SECURE === 'true', maxAge: 8 * 60 * 60 * 1000, path: '/' });
     response.json({ ok: true });
   } catch (error) { response.status(503).json({ error: error.message }); }
 });
 app.post('/api/logout', (request, response) => {
   auth.logout(request.headers.cookie?.match(/(?:^|;\s*)attendance_session=([a-f0-9]+)/)?.[1]);
-  response.clearCookie('attendance_session', { httpOnly: true, sameSite: 'strict', secure: process.env.NODE_ENV === 'production', path: '/' });
+  response.clearCookie('attendance_session', { httpOnly: true, sameSite: 'strict', secure: process.env.COOKIE_SECURE === 'true', path: '/' });
   response.json({ ok: true });
 });
 app.get('/api/session', (request, response) => response.json({ authenticated: auth.isAuthenticated(request.headers.cookie?.match(/(?:^|;\s*)attendance_session=([a-f0-9]+)/)?.[1]) }));

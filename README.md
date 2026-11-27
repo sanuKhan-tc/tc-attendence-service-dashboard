@@ -241,4 +241,16 @@ pnpm build
 The repository also includes `.gitignore`, `.gitattributes`, and `.editorconfig` for local secrets, generated files, line endings, and editor consistency.
 # Dashboard login
 
-Set a private `AUTH_SALT` value in `.env`, then run `pnpm credentials:generate`. The script creates `shared/login.json` with the `admin` username and a salted SHA-256 password hash, and prints the generated password once. Keep `.env` and the shared volume private. Run the script again to rotate the password. Docker mounts `./shared` so credentials survive container rebuilds.
+Set a private `AUTH_SALT` value in `.env`, then run `pnpm credentials:generate`. The script creates `shared/login.json` with the `admin` username and a salted SHA-256 password hash, and prints the generated password once. Optionally set `LOGIN_MASTER_PASSWORD` in `.env` as an emergency `admin` login; it still works if the generated login file is missing. Use a strong value and keep `.env` private. Run the script again to rotate the generated password. Docker mounts `./shared` so credentials survive container rebuilds. Set `COOKIE_SECURE=true` when HTTPS terminates in front of the app.
+
+## Docker deployment
+
+On the deployment host, copy `.env.deploy.example` to `.env.deploy` and set a unique `AUTH_SALT`, strong `LOGIN_MASTER_PASSWORD`, and read-only database credentials. Keep `.env.deploy` private. Generate the normal login inside a one-off Docker container, then start the service:
+
+```sh
+cp .env.deploy.example .env.deploy
+docker compose run --build --rm --entrypoint node attendance-dashboard scripts/generate-login.mjs
+docker compose up --build -d
+```
+
+The service listens on `127.0.0.1:9200`; terminate HTTPS with a reverse proxy and forward requests to that address. `COOKIE_SECURE=true` is enabled for that TLS setup, and `shared/login.json` persists across container rebuilds.
