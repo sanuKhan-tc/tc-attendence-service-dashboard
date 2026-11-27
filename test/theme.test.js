@@ -332,7 +332,7 @@ test('lets .login-card h1 scale down with mobile heading rules', () => {
   assert.doesNotMatch(desktopLoginH1, /font-size\s*:/i, '.login-card h1 should inherit h1, h2 sizing so @media (max-width: 560px) scales it');
 });
 
-test('styles the three overview KPI cards with the three brand colors, bottom-bordered filter card, and compact icon-bg-free layout', () => {
+test('styles the three overview KPI cards with the three brand colors, saffron side-bordered filter card, and compact icon-bg-free layout', () => {
   const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
   const { rules, propHex } = parseTopLevelCss(css);
 
@@ -348,7 +348,8 @@ test('styles the three overview KPI cards with the three brand colors, bottom-bo
   );
 
   const filterCard = rules.get('.filter-card') ?? '';
-  assert.match(filterCard, /border-bottom:\s*3px\s+solid\s+var\(--tc-(?:green|blue|saffron)\);/i);
+  assert.doesNotMatch(filterCard, /border-bottom\s*:/i);
+  assert.match(filterCard, /border-left:\s*4px\s+solid\s+var\(--tc-saffron\);/i);
 
   const summaryCard = rules.get('.summary-card') ?? '';
   assert.doesNotMatch(summaryCard, /min-height\s*:/i, '.summary-card should not force excess vertical negative space via min-height');

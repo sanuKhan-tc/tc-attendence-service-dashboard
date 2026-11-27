@@ -411,7 +411,7 @@ h4 {
   align-items: flex-end;
   gap: 16px;
   padding: 18px 20px;
-  border-bottom: 3px solid var(--tc-green);
+  border-left: 4px solid var(--tc-saffron);
 }
 
 label {
