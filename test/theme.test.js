@@ -492,3 +492,14 @@ test('renders the shared SiteFooter on both the dashboard and login page', () =>
   assert.match(css, /\.login-layout\s*\{/);
   assert.match(css, /\.login-layout \.login-screen\s*\{/);
 });
+
+test('debounces typed overview combobox text before reloading the overview table while keeping option selection immediate', () => {
+  const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
+
+  const debounceMatch = app.match(/const SEARCH_DEBOUNCE_MS = (\d+);/);
+  assert.ok(debounceMatch, 'Expected SEARCH_DEBOUNCE_MS constant');
+  assert.ok(Number(debounceMatch[1]) >= 400, `Expected SEARCH_DEBOUNCE_MS >= 400, got ${debounceMatch[1]}`);
+
+  assert.match(app, /filterAttendanceRows\(flaggedRows,\s*\{\s*location,\s*search:\s*debouncedSearch,\s*tab\s*\}\)/);
+  assert.match(app, /onSelect=\{onSelectEmployee\}[\s\S]*?onQueryChange=\{setSearch\}/);
+});

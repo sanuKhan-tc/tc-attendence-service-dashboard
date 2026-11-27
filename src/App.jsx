@@ -40,7 +40,7 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat('en', { month: 'long', year: 'nu
 const SKELETON_BAR_HEIGHTS = [72, 86, 54, 92, 68, 45, 80, 76, 62, 88];
 const DATA_SOURCE_LABEL = dataSourceLabel(import.meta.env.VITE_LIVE_DATA_ENABLED);
 const APP_VERSION = versionInfo.version;
-const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_DEBOUNCE_MS = 500;
 const CLIENT_CACHE_TTL_MS = 30_000;
 const CLIENT_CACHE_MAX = 25;
 
@@ -581,16 +581,16 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   );
 });
 
-function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange, employeeOptions, employeesLoading }) {
+function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, debouncedSearch, setSearch, onSelectEmployee, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange, employeeOptions, employeesLoading }) {
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
   const columnCount = isDateRange ? 4 : 6;
-  const hasTableFilters = location !== 'All' || Boolean(search) || tab !== 'all';
+  const hasTableFilters = location !== 'All' || Boolean(debouncedSearch) || tab !== 'all';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
-    return filterAttendanceRows(flaggedRows, { location, search, tab });
-  }, [location, report.rows, search, tab]);
+    return filterAttendanceRows(flaggedRows, { location, search: debouncedSearch, tab });
+  }, [debouncedSearch, location, report.rows, tab]);
 
   return (
     <>
@@ -639,7 +639,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
           <EmployeeCombobox
             options={employeeOptions}
             selectedUserId={search}
-            onSelect={setSearch}
+            onSelect={onSelectEmployee}
             onQueryChange={setSearch}
             loading={employeesLoading}
             listId="overview-employee-combobox-list"
@@ -986,9 +986,10 @@ function App() {
 
   // Debounce employee search input to avoid firing an API call on every keystroke
   useEffect(() => {
+    if (search === debouncedSearch) return undefined;
     const timer = window.setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [debouncedSearch, search]);
 
   // Lazy-load /api/attendance/users only when User Reports is opened, with AbortController
   useEffect(() => {
@@ -1179,6 +1180,11 @@ function App() {
     window.location.hash = 'user-report';
   }, [endDate, startDate]);
 
+  const selectOverviewEmployee = useCallback((value) => {
+    setSearch(value);
+    setDebouncedSearch(value);
+  }, []);
+
   const resetFilters = useCallback(() => {
     lastAttendanceKeyRef.current = '';
     attendanceCacheRef.current.clear();
@@ -1307,7 +1313,9 @@ function App() {
               location={location}
               setLocation={setLocation}
               search={search}
+              debouncedSearch={debouncedSearch}
               setSearch={setSearch}
+              onSelectEmployee={selectOverviewEmployee}
               tab={tab}
               setTab={setTab}
               report={report}
