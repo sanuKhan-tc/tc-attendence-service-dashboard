@@ -200,3 +200,134 @@ test('maps typography hierarchy sizes and interactive brand color roles', () => 
   const linkRule = ruleBody('.footer-version');
   assert.match(linkRule, /color:\s*var\(--tc-blue\);/);
 });
+
+function hexToLuminance(hex) {
+  const normalized = hex.replace('#', '');
+  const full = normalized.length === 3
+    ? normalized.split('').map((c) => c + c).join('')
+    : normalized;
+  const [r, g, b] = [0, 2, 4].map((offset) => {
+    const channel = parseInt(full.slice(offset, offset + 2), 16) / 255;
+    return channel <= 0.03928 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function contrastRatio(hexA, hexB) {
+  const lumA = hexToLuminance(hexA);
+  const lumB = hexToLuminance(hexB);
+  const lighter = Math.max(lumA, lumB);
+  const darker = Math.min(lumA, lumB);
+  return (lighter + 0.05) / (darker + 0.05);
+}
+
+function parseTopLevelCss(css) {
+  const stripped = css.replace(/\/\*[\s\S]*?\*\//g, '');
+  const rules = new Map();
+  let depth = 0;
+  let tokenStart = 0;
+  let currentSelector = '';
+  for (let i = 0; i < stripped.length; i += 1) {
+    const ch = stripped[i];
+    if (ch === '{') {
+      if (depth === 0) {
+        currentSelector = stripped.slice(tokenStart, i).replace(/\s+/g, ' ').trim();
+        tokenStart = i + 1;
+      }
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        if (currentSelector && !currentSelector.startsWith('@')) {
+          const body = stripped.slice(tokenStart, i);
+          rules.set(currentSelector, `${rules.get(currentSelector) ?? ''}\n${body}`);
+        }
+        tokenStart = i + 1;
+      }
+    }
+  }
+  const tokens = new Map();
+  for (const [, name, value] of (rules.get(':root') ?? '').matchAll(/(--[a-z0-9-]+)\s*:\s*([^;]+);/gi)) {
+    tokens.set(name, value.trim());
+  }
+  const resolveColor = (value) => {
+    const trimmed = value.trim();
+    const varMatch = trimmed.match(/^var\((--[a-z0-9-]+)\)$/i);
+    const resolved = varMatch ? tokens.get(varMatch[1]) : trimmed;
+    assert.ok(resolved && /^#[0-9a-f]{3,6}$/i.test(resolved), `Expected resolvable hex color, got "${value}" -> "${resolved}"`);
+    return resolved;
+  };
+  const propHex = (selector, prop) => {
+    const body = rules.get(selector);
+    assert.ok(body, `Expected CSS rule for "${selector}"`);
+    const match = body.match(new RegExp(`(?:^|[;\\s])${prop}\\s*:\\s*([^;]+);`, 'i'));
+    assert.ok(match, `Expected "${prop}" in "${selector}"`);
+    return resolveColor(match[1]);
+  };
+  return { rules, tokens, resolveColor, propHex };
+}
+
+test('maintains WCAG AA contrast (>= 4.5:1) for Saffron text tokens on all backgrounds', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { propHex, resolveColor } = parseTopLevelCss(css);
+
+  const saffronSoft = resolveColor('var(--tc-saffron-soft)');
+  const pageBg = resolveColor('var(--tc-bg)');
+  const cardBg = resolveColor('var(--tc-surface)');
+
+  assert.ok(contrastRatio(propHex('.late-status', 'color'), saffronSoft) >= 4.5);
+  assert.ok(contrastRatio(propHex('.metric-pill-alert', 'color'), saffronSoft) >= 4.5);
+  assert.ok(contrastRatio(propHex('.hero-eyebrow', 'color'), pageBg) >= 4.5);
+  assert.ok(contrastRatio(propHex('.hero-eyebrow', 'color'), cardBg) >= 4.5);
+  assert.ok(contrastRatio(propHex('.changelog-entry time', 'color'), cardBg) >= 4.5);
+});
+
+test('maintains WCAG AA contrast (>= 4.5:1) for secondary small text on tinted surfaces', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { propHex, resolveColor } = parseTopLevelCss(css);
+
+  const blueSoft = resolveColor('var(--tc-blue-soft)');
+  const saffronSoft = resolveColor('var(--tc-saffron-soft)');
+  const greenSoft = resolveColor('var(--tc-green-soft)');
+  const criticalHoverBg = propHex('.flagged-row-critical:hover', 'background');
+  const comboboxActiveBg = propHex('.combobox-option.active', 'background');
+
+  assert.ok(contrastRatio(propHex('.calendar-day.has-attendance small', 'color'), blueSoft) >= 4.5);
+  assert.ok(contrastRatio(propHex('.flagged-row-critical .employee-cell small', 'color'), saffronSoft) >= 4.5);
+  assert.ok(contrastRatio(propHex('.flagged-row-critical .employee-cell small', 'color'), criticalHoverBg) >= 4.5);
+  assert.ok(contrastRatio(propHex('.combobox-option.active .combobox-option-text small, .combobox-option.selected .combobox-option-text small', 'color'), greenSoft) >= 4.5);
+  assert.ok(contrastRatio(propHex('.combobox-option.active .combobox-option-text small, .combobox-option.selected .combobox-option-text small', 'color'), comboboxActiveBg) >= 4.5);
+});
+
+test('maintains WCAG 1.4.11 non-text contrast (>= 3.0:1) for Early checkout amber graphics', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { resolveColor } = parseTopLevelCss(css);
+
+  const amber = resolveColor('var(--tc-amber)');
+  const trackBg = resolveColor('var(--tc-border)');
+  const amberSoft = resolveColor('var(--tc-amber-soft)');
+
+  assert.ok(contrastRatio(amber, trackBg) >= 3.0, `Expected amber ${amber} vs track ${trackBg} >= 3.0`);
+  assert.ok(contrastRatio(amber, amberSoft) >= 3.0, `Expected amber ${amber} vs soft ${amberSoft} >= 3.0`);
+});
+
+test('keeps selected combobox avatar visually distinct from the selected option background', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { propHex } = parseTopLevelCss(css);
+
+  const optionBg = propHex('.combobox-option.selected', 'background');
+  const avatarSel = '.combobox-option.active .combobox-avatar, .combobox-option.selected .combobox-avatar';
+  const avatarBg = propHex(avatarSel, 'background');
+  const avatarColor = propHex(avatarSel, 'color');
+
+  assert.ok(contrastRatio(avatarBg, optionBg) >= 3.0, `Expected avatar bg ${avatarBg} vs option bg ${optionBg} >= 3.0`);
+  assert.ok(contrastRatio(avatarColor, avatarBg) >= 4.5, `Expected avatar text ${avatarColor} vs avatar bg ${avatarBg} >= 4.5`);
+});
+
+test('lets .login-card h1 scale down with mobile heading rules', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { rules } = parseTopLevelCss(css);
+  const desktopLoginH1 = rules.get('.login-card h1') ?? '';
+
+  assert.doesNotMatch(desktopLoginH1, /font-size\s*:/i, '.login-card h1 should inherit h1, h2 sizing so @media (max-width: 560px) scales it');
+});

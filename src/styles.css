@@ -67,10 +67,11 @@
 
   --tc-saffron: #e74c2d;
   --tc-saffron-hover: #cc3e22;
+  --tc-saffron-text: #bd361b;
   --tc-saffron-soft: #fdf0ed;
   --tc-saffron-border: #f6c4b9;
 
-  --tc-amber: #d97706;
+  --tc-amber: #b86e00;
   --tc-amber-soft: #fef6e7;
   --tc-amber-border: #f5d399;
 
@@ -85,6 +86,7 @@
   --tc-border-strong: #cbd5e1;
   --tc-text: #1f2937;
   --tc-text-secondary: #64748b;
+  --tc-text-secondary-tinted: #475569;
   --tc-text-muted: #64748b;
 
   --tc-shadow-sm: 0 2px 10px rgba(31, 41, 55, 0.04);
@@ -179,7 +181,6 @@ h4 {
 }
 
 .login-card > img { margin-bottom: 12px; }
-.login-card h1 { font-size: 26px; font-weight: 700; }
 .login-card p { margin: -12px 0 2px; color: var(--tc-text-secondary); font-size: 14px; }
 .login-field {
   display: grid;
@@ -351,7 +352,7 @@ h4 {
 .hero-eyebrow {
   display: inline-block;
   margin-bottom: 4px;
-  color: var(--tc-saffron);
+  color: var(--tc-saffron-text);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 700;
@@ -746,6 +747,10 @@ tbody tr:hover {
   background: #fbe5df;
 }
 
+.flagged-row-critical .employee-cell small {
+  color: var(--tc-text-secondary-tinted);
+}
+
 tbody tr:hover .employee-cell b {
   color: var(--tc-blue);
 }
@@ -768,7 +773,7 @@ tbody tr:hover .employee-cell b {
 
 .metric-pill-alert {
   background: var(--tc-saffron-soft);
-  color: var(--tc-saffron-hover);
+  color: var(--tc-saffron-text);
   box-shadow: inset 0 0 0 1px var(--tc-saffron-border);
 }
 
@@ -878,7 +883,7 @@ tbody tr:hover .employee-cell b {
 
 .late-status {
   background: var(--tc-saffron-soft);
-  color: var(--tc-saffron-hover);
+  color: var(--tc-saffron-text);
 }
 
 .early-status {
@@ -977,7 +982,7 @@ tbody tr:hover .employee-cell b {
 
 .changelog-entry:first-child { border-top: 0; }
 .changelog-entry time {
-  color: var(--tc-saffron);
+  color: var(--tc-saffron-text);
   font-family: var(--font-ui);
   font-size: 12px;
   font-weight: 700;
@@ -1229,8 +1234,13 @@ tbody tr:hover .employee-cell b {
 
 .combobox-option.active .combobox-avatar,
 .combobox-option.selected .combobox-avatar {
-  background: var(--tc-green-soft);
-  color: var(--tc-green);
+  background: var(--tc-green);
+  color: #ffffff;
+}
+
+.combobox-option.active .combobox-option-text small,
+.combobox-option.selected .combobox-option-text small {
+  color: var(--tc-text-secondary-tinted);
 }
 
 .combobox-option-text {
@@ -1482,6 +1492,10 @@ tbody tr:hover .employee-cell b {
 .calendar-day.has-attendance {
   border-color: var(--tc-blue-border);
   background: var(--tc-blue-soft);
+}
+
+.calendar-day.has-attendance small {
+  color: var(--tc-text-secondary-tinted);
 }
 
 .calendar-day b { color: var(--tc-blue); font-family: var(--font-ui); }
