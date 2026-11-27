@@ -433,3 +433,22 @@ test('renders flagged table toolbar without heading, saffron circular reset butt
   assert.match(exportIcon, /background:\s*var\(--tc-saffron\);/);
   assert.match(exportIcon, /color:\s*#ffffff;/);
 });
+
+test('uses saffron tabbed table header, dim saffron late icon bg, uniform rounded card corners, and rounded-square avatars', () => {
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { rules } = parseTopLevelCss(css);
+
+  const flaggedHeader = rules.get('.flagged-table thead th') ?? '';
+  assert.match(flaggedHeader, /background:\s*var\(--tc-saffron\);/);
+  assert.match(flaggedHeader, /color:\s*#ffffff;/);
+
+  const lateIcon = rules.get('.late-card .summary-icon') ?? '';
+  assert.match(lateIcon, /background:\s*var\(--tc-saffron-soft\);/);
+
+  assert.match(rules.get('.summary-card') ?? '', /border-radius:\s*16px;/);
+  assert.match(rules.get('.calendar-card') ?? '', /border-radius:\s*16px;/);
+  assert.match(rules.get('.chart-card') ?? '', /border-radius:\s*16px;/);
+  assert.match(rules.get('.avatar') ?? '', /border-radius:\s*10px;/);
+  assert.match(rules.get('.skeleton-avatar') ?? '', /border-radius:\s*10px;/);
+  assert.doesNotMatch(css, /border-radius:\s*0\s+\d+px\s+0\s+\d+px;/, 'No asymmetric sharp-corner card/avatar radii should remain');
+});

@@ -636,7 +636,7 @@ select:focus {
   align-items: center;
   gap: 6px 12px;
   border: 1px solid var(--tc-border);
-  border-radius: 0 16px 0 16px;
+  border-radius: 16px;
   padding: 14px 18px 14px 20px;
   background: var(--tc-surface);
   box-shadow: var(--tc-shadow-sm);
@@ -698,11 +698,18 @@ select:focus {
 
 .summary-icon {
   display: inline-flex;
+  width: 30px;
+  height: 30px;
   align-items: center;
   justify-content: center;
+  border-radius: 8px;
   background: transparent;
   color: var(--accent);
   flex-shrink: 0;
+}
+
+.late-card .summary-icon {
+  background: var(--tc-saffron-soft);
 }
 
 .summary-card strong {
@@ -851,7 +858,10 @@ th {
   position: sticky;
   top: 0;
   z-index: 2;
-  box-shadow: 0 1px 0 var(--tc-border);
+  background: var(--tc-saffron);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 1px 0 var(--tc-saffron-hover);
 }
 
 td {
@@ -927,7 +937,7 @@ tbody tr:hover .employee-cell b {
   width: 36px;
   height: 36px;
   place-items: center;
-  border-radius: 0 11px 0 11px;
+  border-radius: 10px;
   background: var(--tc-blue-soft);
   color: var(--tc-blue);
   font-family: var(--font-ui);
@@ -1470,9 +1480,9 @@ tbody tr:hover .employee-cell b {
 }
 
 .skeleton-icon {
-  width: 18px;
-  height: 18px;
-  border-radius: 4px;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
   flex-shrink: 0;
 }
 
@@ -1499,13 +1509,14 @@ tbody tr:hover .employee-cell b {
 .skeleton-avatar {
   width: 36px;
   height: 36px;
-  border-radius: 0 11px 0 11px;
+  border-radius: 10px;
   flex-shrink: 0;
 }
 
 .skeleton-avatar.sm {
   width: 30px;
   height: 30px;
+  border-radius: 8px;
 }
 
 .skeleton-stack {
@@ -1559,7 +1570,7 @@ tbody tr:hover .employee-cell b {
   margin: 0 22px 22px;
   padding: 18px 20px;
   border: 1px solid var(--tc-border);
-  border-radius: 0 18px 0 18px;
+  border-radius: 16px;
   background: var(--tc-surface-muted);
 }
 
@@ -1673,7 +1684,7 @@ tbody tr:hover .employee-cell b {
   min-width: 0;
   padding: 18px 20px;
   border: 1px solid var(--tc-border);
-  border-radius: 0 18px 0 18px;
+  border-radius: 16px;
   background: var(--tc-surface-muted);
 }
 
