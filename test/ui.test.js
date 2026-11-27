@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCalendarWeeks, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatDurationBetween, formatTableDateRange, formatTime, getOverviewDateRange, isOverviewMetricFlagged, isOverviewRowCritical, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
+import { buildCalendarWeeks, buildFlaggedEmployeeOptions, buildHistoryChartData, dataSourceLabel, filterAttendanceRows, formatDateRange, formatDurationBetween, formatTableDateRange, formatTime, getOverviewDateRange, isOverviewMetricFlagged, isOverviewRowCritical, isTodayDateRange, paginateRows, presentDaysLabel } from '../src/attendanceUi.js';
 
 const rows = [
   { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', firstIn: '2026-11-19T08:31:00Z', status: ['Late arrival'], late: true, early: false, underEight: false },
@@ -107,4 +107,18 @@ test('recognizes only an exact today overview date', () => {
   assert.equal(isTodayDateRange('2026-01-15', '2026-01-15', today), true);
   assert.equal(isTodayDateRange('2026-01-14', '2026-01-14', today), false);
   assert.equal(isTodayDateRange('2026-01-01', '2026-01-15', today), false);
+});
+
+test('builds sorted, deduplicated combobox options from flagged attendance rows only', () => {
+  const options = buildFlaggedEmployeeOptions([
+    { userId: 'EMP-2', employee: 'Omar Hassan', location: 'India - Hyderabad', status: ['Early checkout'] },
+    { userId: 'EMP-4', employee: 'Clean Record', location: 'Dubai', status: [] },
+    { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', status: ['Late arrival'] },
+    { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai', status: ['Late arrival'] },
+  ]);
+
+  assert.deepEqual(options, [
+    { userId: 'EMP-1', employee: 'Aisha Khan', location: 'Dubai' },
+    { userId: 'EMP-2', employee: 'Omar Hassan', location: 'India - Hyderabad' },
+  ]);
 });

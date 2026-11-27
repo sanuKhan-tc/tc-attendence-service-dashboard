@@ -1,6 +1,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildCalendarWeeks,
+  buildFlaggedEmployeeOptions,
   buildHistoryChartData,
   dataSourceLabel,
   filterAttendanceRows,
@@ -39,7 +40,7 @@ const MONTH_FORMATTER = new Intl.DateTimeFormat('en', { month: 'long', year: 'nu
 const SKELETON_BAR_HEIGHTS = [72, 86, 54, 92, 68, 45, 80, 76, 62, 88];
 const DATA_SOURCE_LABEL = dataSourceLabel(import.meta.env.VITE_LIVE_DATA_ENABLED);
 const APP_VERSION = versionInfo.version;
-const SEARCH_DEBOUNCE_MS = 250;
+const SEARCH_DEBOUNCE_MS = 500;
 const CLIENT_CACHE_TTL_MS = 30_000;
 const CLIENT_CACHE_MAX = 25;
 
@@ -116,6 +117,22 @@ function Spinner({ light = false, size = 15 }) {
   );
 }
 
+function FlagIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
+function tabIcon(id) {
+  if (id === 'all') return <FlagIcon />;
+  if (id === 'late') return <LateIcon />;
+  if (id === 'early') return <EarlyIcon />;
+  return <HoursIcon />;
+}
+
 function LateIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -180,6 +197,25 @@ function CheckIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function ResetIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
+
+function ExportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
     </svg>
   );
 }
@@ -344,7 +380,7 @@ const SummaryCards = memo(function SummaryCards({ summary, presentDaysRows }) {
   );
 });
 
-const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserId, onSelect, loading }) {
+const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserId, onSelect, onQueryChange, loading, listId = 'employee-combobox-list' }) {
   const containerRef = useRef(null);
   const listRef = useRef(null);
   const selectedUser = useMemo(
@@ -357,8 +393,12 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
+    if (onQueryChange) {
+      if (!selectedUserId) setQuery('');
+      return;
+    }
     setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
-  }, [selectedUser]);
+  }, [onQueryChange, selectedUser, selectedUserId]);
 
   const filteredOptions = useMemo(() => {
     if (selectedUser && deferredQuery === formatEmployeeLabel(selectedUser)) {
@@ -375,12 +415,14 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
     function handleOutsideClick(event) {
       if (containerRef.current && !containerRef.current.contains(event.target)) {
         setOpen(false);
-        setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+        if (!onQueryChange) {
+          setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+        }
       }
     }
     document.addEventListener('mousedown', handleOutsideClick);
     return () => document.removeEventListener('mousedown', handleOutsideClick);
-  }, [selectedUser]);
+  }, [onQueryChange, selectedUser]);
 
   useEffect(() => {
     if (!open || !listRef.current) return;
@@ -420,7 +462,9 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
       selectOption(filteredOptions[activeIndex]);
     } else if (event.key === 'Escape') {
       setOpen(false);
-      setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+      if (!onQueryChange) {
+        setQuery(selectedUser ? formatEmployeeLabel(selectedUser) : '');
+      }
     }
   }
 
@@ -433,9 +477,9 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
           type="text"
           role="combobox"
           aria-expanded={open}
-          aria-controls="employee-combobox-list"
+          aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={activeOption ? `employee-opt-${activeOption.userId}` : undefined}
+          aria-activedescendant={activeOption ? `${listId}-opt-${activeOption.userId}` : undefined}
           aria-label="Employee"
           placeholder={loading ? 'Loading employees…' : 'Search employee by name or ID'}
           value={query}
@@ -444,7 +488,9 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
             const nextValue = event.target.value;
             setQuery(nextValue);
             setOpen(true);
-            if (!nextValue.trim()) {
+            if (onQueryChange) {
+              onQueryChange(nextValue);
+            } else if (!nextValue.trim()) {
               onSelect('');
             }
           }}
@@ -480,7 +526,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
       </div>
 
       {open && (
-        <div className="combobox-popover" id="employee-combobox-list" role="listbox" ref={listRef}>
+        <div className="combobox-popover" id={listId} role="listbox" ref={listRef}>
           {loading ? (
             <div className="combobox-loading" aria-busy="true">
               <div className="combobox-loading-header">
@@ -504,7 +550,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
               return (
                 <button
                   key={user.userId}
-                  id={`employee-opt-${user.userId}`}
+                  id={`${listId}-opt-${user.userId}`}
                   type="button"
                   role="option"
                   aria-selected={isSelected}
@@ -535,16 +581,16 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   );
 });
 
-function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange }) {
+function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, debouncedSearch, setSearch, onSelectEmployee, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange, employeeOptions, employeesLoading }) {
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
   const columnCount = isDateRange ? 4 : 6;
-  const hasTableFilters = location !== 'All' || Boolean(search) || tab !== 'all';
+  const hasTableFilters = location !== 'All' || Boolean(debouncedSearch) || tab !== 'all';
   const visibleRows = useMemo(() => {
     const flaggedRows = report.rows.filter((row) => row.status.length > 0);
-    return filterAttendanceRows(flaggedRows, { location, search, tab });
-  }, [location, report.rows, search, tab]);
+    return filterAttendanceRows(flaggedRows, { location, search: debouncedSearch, tab });
+  }, [debouncedSearch, location, report.rows, tab]);
 
   return (
     <>
@@ -588,19 +634,34 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
             {isLoading && <span className="field-loader" aria-hidden="true"><Spinner size={14} /></span>}
           </div>
         </label>
-        <label className="employee-filter">
-          <span>Employee</span>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or employee ID" />
-        </label>
-        <button className="reset-button" type="button" onClick={resetFilters}>Reset filters</button>
+        <div className="control-field employee-filter">
+          <span className="field-label">Employee</span>
+          <EmployeeCombobox
+            options={employeeOptions}
+            selectedUserId={search}
+            onSelect={onSelectEmployee}
+            onQueryChange={setSearch}
+            loading={employeesLoading}
+            listId="overview-employee-combobox-list"
+          />
+        </div>
+        <button className="icon-reset-button" type="button" onClick={resetFilters} title="Reset filters" aria-label="Reset filters"><ResetIcon /></button>
       </section>
 
       {isLoading ? <SummaryCardsSkeleton /> : <SummaryCards summary={report.summary} />}
 
       <section className="flagged-card">
-        <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
-        <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
-        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody>
+        <div className="flagged-toolbar">
+          <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{tabIcon(item.id)}<span>{item.label}</span></button>)}</div>
+          <div className="section-actions">
+            {exportError && <span className="error-message" role="alert">{exportError}</span>}
+            <button className="export-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>
+              <ExportIcon />
+              <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+            </button>
+          </div>
+        </div>
+        <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody className="content-fade" key={`${tab}-${pagination.page}-${state}`}>
           {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showStatus={isDateRange} />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
           {state === 'ready' && visibleRows.map((row) => <tr className={`clickable-table-row${isOverviewRowCritical(row, isDateRange) ? ' flagged-row-critical' : ''}`} key={row.userId} onClick={() => onSelectUser(row.userId)}>
@@ -610,7 +671,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
             {!isDateRange && (
               <>
                 <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'firstIn', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatTime(row.firstIn)}</span></td>
-                <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'lastOut', isDateRange) ? ' metric-pill-alert' : ''}`}>{row.lastOut ? formatTime(row.lastOut) : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</span></td>
+                <td className="num-cell">{row.lastOut ? <span className={`metric-pill${isOverviewMetricFlagged(row, 'lastOut', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatTime(row.lastOut)}</span> : <span className="in-office">{isToday ? 'In office' : 'Not logged out'}</span>}</td>
                 <td className="num-cell"><span className={`metric-pill${isOverviewMetricFlagged(row, 'totalHours', isDateRange) ? ' metric-pill-alert' : ''}`}>{formatDurationBetween(row.firstIn, row.lastOut)}</span></td>
               </>
             )}
@@ -642,9 +703,9 @@ const HistoryCharts = memo(function HistoryCharts({ rows }) {
       maxMinutes: Math.max(maxMins, 1),
       statusTotal: data.length || 1,
       metrics: [
-        { label: 'Late arrivals', value: lateCount, color: '#e94b2e' },
-        { label: 'Early checkouts', value: earlyCount, color: '#e67e22' },
-        { label: 'Under 8 hours', value: underEightCount, color: '#fb3b5e' },
+        { label: 'Late arrivals', value: lateCount, color: 'var(--tc-saffron)' },
+        { label: 'Early checkouts', value: earlyCount, color: 'var(--tc-amber)' },
+        { label: 'Under 8 hours', value: underEightCount, color: 'var(--tc-crimson)' },
       ],
     };
   }, [rows]);
@@ -694,7 +755,7 @@ const AttendanceCalendar = memo(function AttendanceCalendar({ rows, month, setMo
         <label><span>Month</span><input type="month" value={month} onChange={(event) => setMonth(event.target.value)} /></label>
       </div>
       <div className="calendar-grid calendar-weekdays">{DAY_NAMES.map((day) => <span key={day}>{day}</span>)}</div>
-      <div className="calendar-grid calendar-days">{cells.map((cell, index) => <div className={cell.date ? `calendar-day ${cell.row ? 'has-attendance' : ''}` : 'calendar-day empty'} key={cell.date || `empty-${index}`}>
+      <div className="calendar-grid calendar-days content-fade" key={month}>{cells.map((cell, index) => <div className={cell.date ? `calendar-day ${cell.row ? 'has-attendance' : ''}` : 'calendar-day empty'} key={cell.date || `empty-${index}`}>
         {cell.date && <><b>{Number(cell.date.slice(-2))}</b>{cell.row && <><span className={cell.row.status.length ? 'calendar-dot flagged' : 'calendar-dot'} /><small>{cell.row.lastOut ? formatTime(cell.row.firstIn) : 'In office'}</small></>}</>}
       </div>)}</div>
       <div className="calendar-legend"><span><i className="calendar-dot" />Recorded attendance</span><span><i className="calendar-dot flagged" />Flagged attendance</span></div>
@@ -736,7 +797,12 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <h2>User report</h2>
             <p className="page-subtitle">Review attendance for one employee across selected dates.</p>
           </div>
-          <div className="section-actions"><button className="reset-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>Export Excel</button></div>
+          <div className="section-actions">
+            <button className="export-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>
+              <ExportIcon />
+              <span>Export</span>
+            </button>
+          </div>
         </div>
         <div className="history-controls">
           <div className="control-field employee-combobox-field">
@@ -770,7 +836,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
               'Load report'
             )}
           </button>
-          <button className="reset-button" type="button" onClick={resetHistoryFilters}>Reset filters</button>
+          <button className="icon-reset-button" type="button" onClick={resetHistoryFilters} title="Reset filters" aria-label="Reset filters"><ResetIcon /></button>
         </div>
         {historyState === 'idle' && <p className="history-message">Select an employee and date range to view attendance history.</p>}
         {isHistoryLoading && (
@@ -787,14 +853,14 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
         )}
         {historyState === 'error' && <p className="history-message error-message">{historyError}</p>}
         {historyState === 'ready' && (
-          <>
+          <div className="content-rise">
             <SummaryCards summary={visibleSummary} presentDaysRows={visibleHistory} />
             <AttendanceCalendar rows={visibleHistory} month={calendarMonth} setMonth={setCalendarMonth} />
             <HistoryCharts rows={visibleHistory} />
             <div className="table-wrap history-table">
               <table>
                 <thead><tr><th>Date</th><th>Location</th><th>First in</th><th>Last out</th><th>Recorded time</th><th>Status</th></tr></thead>
-                <tbody>
+                <tbody className="content-fade" key={pagedHistory.page}>
                   {pagedHistory.rows.map((row) => (
                     <tr key={`${row.userId}-${row.date}`}>
                       <td className="num-cell">{row.date}</td>
@@ -822,7 +888,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
                 </span>
               )}
             </footer>
-          </>
+          </div>
         )}
       </section>
     </>
@@ -856,7 +922,7 @@ function ChangelogPage() {
         </div>
         <span className="meta-pill meta-date">v{APP_VERSION}</span>
       </div>
-      <div className="changelog-list">
+      <div className={state === 'ready' ? 'changelog-list content-fade' : 'changelog-list'}>
         {state === 'loading' && <p className="changelog-message">Loading changelog…</p>}
         {state === 'error' && <p className="changelog-message error-message">Unable to load changelog.</p>}
         {state === 'ready' && entries.length === 0 && <p className="changelog-message">No changelog entries available.</p>}
@@ -901,11 +967,14 @@ function App() {
   const [historyError, setHistoryError] = useState('');
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [overviewEmployeeOptions, setOverviewEmployeeOptions] = useState([]);
+  const [overviewEmployeesLoading, setOverviewEmployeesLoading] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState('');
 
   const usersLoadedRef = useRef(false);
   const lastAttendanceKeyRef = useRef('');
   const attendanceCacheRef = useRef(new Map());
+  const overviewEmployeesCacheRef = useRef(new Map());
   const historyAbortRef = useRef(null);
   const historyLoadRequestedRef = useRef(false);
 
@@ -917,9 +986,10 @@ function App() {
 
   // Debounce employee search input to avoid firing an API call on every keystroke
   useEffect(() => {
+    if (search === debouncedSearch) return undefined;
     const timer = window.setTimeout(() => setDebouncedSearch(search), SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [debouncedSearch, search]);
 
   // Lazy-load /api/attendance/users only when User Reports is opened, with AbortController
   useEffect(() => {
@@ -1035,6 +1105,64 @@ function App() {
     return () => controller.abort();
   }, [authenticated, page, startDate, endDate, location, pageNumber, debouncedSearch, tab]);
 
+  // Populate Overview employee combobox strictly with employees flagged in the current date/location/tab scope
+  useEffect(() => {
+    if (!authenticated || page !== 'dashboard' || !startDate || !endDate) return undefined;
+    const scopeKey = `${startDate}|${endDate}|${location}|${tab}`;
+    const cached = getCachedEntry(overviewEmployeesCacheRef.current, scopeKey);
+    if (cached) {
+      setOverviewEmployeeOptions(cached);
+      setOverviewEmployeesLoading(false);
+      return undefined;
+    }
+
+    if (state === 'error') {
+      setOverviewEmployeesLoading(false);
+      return undefined;
+    }
+
+    if (state !== 'ready') {
+      setOverviewEmployeesLoading(true);
+      return undefined;
+    }
+
+    if (!debouncedSearch && pagination.totalPages <= 1) {
+      const singlePageOptions = buildFlaggedEmployeeOptions(report.rows);
+      setCachedEntry(overviewEmployeesCacheRef.current, scopeKey, singlePageOptions);
+      setOverviewEmployeeOptions(singlePageOptions);
+      setOverviewEmployeesLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setOverviewEmployeesLoading(true);
+
+    fetchAllAttendanceRows((url) => fetch(url, { signal: controller.signal }), {
+      startDate,
+      endDate,
+      location,
+      search: '',
+      tab,
+    })
+      .then((rows) => {
+        const nextOptions = buildFlaggedEmployeeOptions(rows);
+        setCachedEntry(overviewEmployeesCacheRef.current, scopeKey, nextOptions);
+        setOverviewEmployeeOptions(nextOptions);
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setOverviewEmployeeOptions(buildFlaggedEmployeeOptions(report.rows));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setOverviewEmployeesLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [authenticated, page, startDate, endDate, location, tab, state, debouncedSearch, report.rows, pagination.totalPages]);
+
   const userOptions = useMemo(() => [...(users.length ? users : report.rows)].sort((a, b) => a.employee.localeCompare(b.employee)), [report.rows, users]);
 
   const openUserReport = useCallback((userId) => {
@@ -1052,9 +1180,15 @@ function App() {
     window.location.hash = 'user-report';
   }, [endDate, startDate]);
 
+  const selectOverviewEmployee = useCallback((value) => {
+    setSearch(value);
+    setDebouncedSearch(value);
+  }, []);
+
   const resetFilters = useCallback(() => {
     lastAttendanceKeyRef.current = '';
     attendanceCacheRef.current.clear();
+    overviewEmployeesCacheRef.current.clear();
     setDatePreset('latest');
     setStartDate('');
     setEndDate('');
@@ -1167,57 +1301,71 @@ function App() {
       <Navigation page={page} dataSource={DATA_SOURCE_LABEL} />
       <button className="logout-button" onClick={async () => { await fetch('/api/logout', { method: 'POST' }); setAuthenticated(false); }}>Sign out</button>
       <main className="app-shell">
-        {page === 'dashboard' ? (
-          <DashboardPage
-            datePreset={datePreset}
-            setDatePreset={setDatePreset}
-            startDate={startDate}
-            setStartDate={setStartDate}
-            endDate={endDate}
-            setEndDate={setEndDate}
-            location={location}
-            setLocation={setLocation}
-            search={search}
-            setSearch={setSearch}
-            tab={tab}
-            setTab={setTab}
-            report={report}
-            state={state}
-            error={error}
-            onSelectUser={openUserReport}
-            resetFilters={resetFilters}
-            pagination={pagination}
-            setPage={setPageNumber}
-            onExport={exportOverview}
-            isExporting={isExporting}
-            exportError={exportError}
-            onPresetChange={onPresetChange}
-          />
-        ) : page === 'user-report' ? (
-          <UserReportPage
-            userOptions={userOptions}
-            usersLoading={usersLoading}
-            selectedUserId={selectedUserId}
-            setSelectedUserId={setSelectedUserId}
-            historyPreset={historyPreset}
-            setHistoryPreset={setHistoryPreset}
-            historyFrom={historyFrom}
-            setHistoryFrom={setHistoryFrom}
-            historyTo={historyTo}
-            setHistoryTo={setHistoryTo}
-            onHistoryPresetChange={onHistoryPresetChange}
-            loadUserHistory={loadUserHistory}
-            resetHistoryFilters={resetHistoryFilters}
-            history={history}
-            historyState={historyState}
-            historyError={historyError}
-            calendarMonth={calendarMonth || (historyTo || endDate || startDate || '2026-01').slice(0, 7)}
-            setCalendarMonth={setCalendarMonth}
-          />
-        ) : <ChangelogPage />}
+        <div className="page-transition" key={page}>
+          {page === 'dashboard' ? (
+            <DashboardPage
+              datePreset={datePreset}
+              setDatePreset={setDatePreset}
+              startDate={startDate}
+              setStartDate={setStartDate}
+              endDate={endDate}
+              setEndDate={setEndDate}
+              location={location}
+              setLocation={setLocation}
+              search={search}
+              debouncedSearch={debouncedSearch}
+              setSearch={setSearch}
+              onSelectEmployee={selectOverviewEmployee}
+              tab={tab}
+              setTab={setTab}
+              report={report}
+              state={state}
+              error={error}
+              onSelectUser={openUserReport}
+              resetFilters={resetFilters}
+              pagination={pagination}
+              setPage={setPageNumber}
+              onExport={exportOverview}
+              isExporting={isExporting}
+              exportError={exportError}
+              onPresetChange={onPresetChange}
+              employeeOptions={overviewEmployeeOptions}
+              employeesLoading={overviewEmployeesLoading}
+            />
+          ) : page === 'user-report' ? (
+            <UserReportPage
+              userOptions={userOptions}
+              usersLoading={usersLoading}
+              selectedUserId={selectedUserId}
+              setSelectedUserId={setSelectedUserId}
+              historyPreset={historyPreset}
+              setHistoryPreset={setHistoryPreset}
+              historyFrom={historyFrom}
+              setHistoryFrom={setHistoryFrom}
+              historyTo={historyTo}
+              setHistoryTo={setHistoryTo}
+              onHistoryPresetChange={onHistoryPresetChange}
+              loadUserHistory={loadUserHistory}
+              resetHistoryFilters={resetHistoryFilters}
+              history={history}
+              historyState={historyState}
+              historyError={historyError}
+              calendarMonth={calendarMonth || (historyTo || endDate || startDate || '2026-01').slice(0, 7)}
+              setCalendarMonth={setCalendarMonth}
+            />
+          ) : <ChangelogPage />}
+        </div>
       </main>
-      <footer className="site-footer">
-        <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
+      <SiteFooter page={page} />
+    </div>
+  );
+}
+
+function SiteFooter({ page = '', showChangelogLink = true }) {
+  return (
+    <footer className="site-footer">
+      <img className="footer-logo" src="/techcarrot-logo.svg" alt="techcarrot" width="110" height="28" />
+      {showChangelogLink ? (
         <a
           className={page === 'changelog' ? 'footer-version active' : 'footer-version'}
           href="#changelog"
@@ -1225,8 +1373,10 @@ function App() {
         >
           v{APP_VERSION}
         </a>
-      </footer>
-    </div>
+      ) : (
+        <span className="footer-version">v{APP_VERSION}</span>
+      )}
+    </footer>
   );
 }
 
@@ -1243,14 +1393,21 @@ function LoginScreen({ onLogin }) {
     } catch (loginError) { setError(loginError.message || 'Unable to sign in.'); }
     finally { setBusy(false); }
   }
-  return <main className="login-screen"><form className="login-card" onSubmit={submit}>
-    <img src="/techcarrot-logo.svg" alt="techcarrot" width="136" />
-    <span className="hero-eyebrow">Attendance portal</span><h1>Welcome back</h1><p>Sign in to view attendance insights.</p>
-    <label className="login-field">Username<input name="username" autoComplete="username" required autoFocus /></label>
-    <label className="login-field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
-    {error && <p className="login-error" role="alert">{error}</p>}
-    <button className="primary-button" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
-  </form></main>;
+  return (
+    <div className="app-layout login-layout">
+      <main className="login-screen">
+        <form className="login-card" onSubmit={submit}>
+          <img src="/techcarrot-logo.svg" alt="techcarrot" width="136" />
+          <span className="hero-eyebrow">Attendance portal</span><h1>Welcome back</h1><p>Sign in to view attendance insights.</p>
+          <label className="login-field">Username<input name="username" autoComplete="username" required autoFocus /></label>
+          <label className="login-field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
+          {error && <p className="login-error" role="alert">{error}</p>}
+          <button className="primary-button" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+        </form>
+      </main>
+      <SiteFooter showChangelogLink={false} />
+    </div>
+  );
 }
 
 export default App;
