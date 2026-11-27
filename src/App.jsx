@@ -642,9 +642,9 @@ const HistoryCharts = memo(function HistoryCharts({ rows }) {
       maxMinutes: Math.max(maxMins, 1),
       statusTotal: data.length || 1,
       metrics: [
-        { label: 'Late arrivals', value: lateCount, color: '#e94b2e' },
-        { label: 'Early checkouts', value: earlyCount, color: '#e67e22' },
-        { label: 'Under 8 hours', value: underEightCount, color: '#fb3b5e' },
+        { label: 'Late arrivals', value: lateCount, color: 'var(--tc-saffron)' },
+        { label: 'Early checkouts', value: earlyCount, color: 'var(--tc-amber)' },
+        { label: 'Under 8 hours', value: underEightCount, color: 'var(--tc-crimson)' },
       ],
     };
   }, [rows]);
