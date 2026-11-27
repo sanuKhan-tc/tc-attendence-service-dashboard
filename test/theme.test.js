@@ -473,13 +473,13 @@ test('uses neutral tabbed table header, dim saffron late icon bg, uniform rounde
   assert.doesNotMatch(css, /border-radius:\s*0\s+\d+px\s+0\s+\d+px;/, 'No asymmetric sharp-corner card/avatar radii should remain');
 });
 
-test('uses EmployeeCombobox for employee search on the overview page and loads users for dashboard', () => {
+test('uses EmployeeCombobox scoped to flagged overview employees while keeping /api/attendance/users for user-report', () => {
   const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
 
   assert.doesNotMatch(app, /<label className="employee-filter">/);
-  assert.match(app, /<div className="control-field employee-filter">[\s\S]*?<EmployeeCombobox[\s\S]*?onQueryChange=\{setSearch\}/);
-  assert.match(app, /page !== 'dashboard' && page !== 'user-report'/);
-  assert.match(app, /<DashboardPage[\s\S]*?userOptions=\{userOptions\}[\s\S]*?usersLoading=\{usersLoading\}/);
+  assert.match(app, /<div className="control-field employee-filter">[\s\S]*?<EmployeeCombobox[\s\S]*?options=\{employeeOptions\}[\s\S]*?onQueryChange=\{setSearch\}/);
+  assert.match(app, /page !== 'user-report' \|\| usersLoadedRef\.current/);
+  assert.match(app, /<DashboardPage[\s\S]*?employeeOptions=\{overviewEmployeeOptions\}[\s\S]*?employeesLoading=\{overviewEmployeesLoading\}/);
 });
 
 test('renders the shared SiteFooter on both the dashboard and login page', () => {

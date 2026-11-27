@@ -1,6 +1,7 @@
 import { memo, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildCalendarWeeks,
+  buildFlaggedEmployeeOptions,
   buildHistoryChartData,
   dataSourceLabel,
   filterAttendanceRows,
@@ -580,7 +581,7 @@ const EmployeeCombobox = memo(function EmployeeCombobox({ options, selectedUserI
   );
 });
 
-function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange, userOptions, usersLoading }) {
+function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, endDate, setEndDate, location, setLocation, search, setSearch, tab, setTab, report, state, error, onSelectUser, resetFilters, pagination, setPage, onExport, isExporting, exportError, onPresetChange, employeeOptions, employeesLoading }) {
   const isLoading = state === 'loading';
   const isDateRange = Boolean(startDate && endDate && startDate !== endDate);
   const isToday = isTodayDateRange(startDate, endDate);
@@ -636,11 +637,11 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
         <div className="control-field employee-filter">
           <span className="field-label">Employee</span>
           <EmployeeCombobox
-            options={userOptions}
+            options={employeeOptions}
             selectedUserId={search}
             onSelect={setSearch}
             onQueryChange={setSearch}
-            loading={usersLoading}
+            loading={employeesLoading}
             listId="overview-employee-combobox-list"
           />
         </div>
@@ -966,11 +967,14 @@ function App() {
   const [historyError, setHistoryError] = useState('');
   const [users, setUsers] = useState([]);
   const [usersLoading, setUsersLoading] = useState(false);
+  const [overviewEmployeeOptions, setOverviewEmployeeOptions] = useState([]);
+  const [overviewEmployeesLoading, setOverviewEmployeesLoading] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState('');
 
   const usersLoadedRef = useRef(false);
   const lastAttendanceKeyRef = useRef('');
   const attendanceCacheRef = useRef(new Map());
+  const overviewEmployeesCacheRef = useRef(new Map());
   const historyAbortRef = useRef(null);
   const historyLoadRequestedRef = useRef(false);
 
@@ -986,9 +990,9 @@ function App() {
     return () => window.clearTimeout(timer);
   }, [search]);
 
-  // Lazy-load /api/attendance/users for Overview and User Reports employee comboboxes, with AbortController
+  // Lazy-load /api/attendance/users only when User Reports is opened, with AbortController
   useEffect(() => {
-    if (!authenticated || (page !== 'dashboard' && page !== 'user-report') || usersLoadedRef.current) return undefined;
+    if (!authenticated || page !== 'user-report' || usersLoadedRef.current) return undefined;
 
     const controller = new AbortController();
     setUsersLoading(true);
@@ -1100,6 +1104,64 @@ function App() {
     return () => controller.abort();
   }, [authenticated, page, startDate, endDate, location, pageNumber, debouncedSearch, tab]);
 
+  // Populate Overview employee combobox strictly with employees flagged in the current date/location/tab scope
+  useEffect(() => {
+    if (!authenticated || page !== 'dashboard' || !startDate || !endDate) return undefined;
+    const scopeKey = `${startDate}|${endDate}|${location}|${tab}`;
+    const cached = getCachedEntry(overviewEmployeesCacheRef.current, scopeKey);
+    if (cached) {
+      setOverviewEmployeeOptions(cached);
+      setOverviewEmployeesLoading(false);
+      return undefined;
+    }
+
+    if (state === 'error') {
+      setOverviewEmployeesLoading(false);
+      return undefined;
+    }
+
+    if (state !== 'ready') {
+      setOverviewEmployeesLoading(true);
+      return undefined;
+    }
+
+    if (!debouncedSearch && pagination.totalPages <= 1) {
+      const singlePageOptions = buildFlaggedEmployeeOptions(report.rows);
+      setCachedEntry(overviewEmployeesCacheRef.current, scopeKey, singlePageOptions);
+      setOverviewEmployeeOptions(singlePageOptions);
+      setOverviewEmployeesLoading(false);
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    setOverviewEmployeesLoading(true);
+
+    fetchAllAttendanceRows((url) => fetch(url, { signal: controller.signal }), {
+      startDate,
+      endDate,
+      location,
+      search: '',
+      tab,
+    })
+      .then((rows) => {
+        const nextOptions = buildFlaggedEmployeeOptions(rows);
+        setCachedEntry(overviewEmployeesCacheRef.current, scopeKey, nextOptions);
+        setOverviewEmployeeOptions(nextOptions);
+      })
+      .catch((requestError) => {
+        if (requestError.name !== 'AbortError') {
+          setOverviewEmployeeOptions(buildFlaggedEmployeeOptions(report.rows));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) {
+          setOverviewEmployeesLoading(false);
+        }
+      });
+
+    return () => controller.abort();
+  }, [authenticated, page, startDate, endDate, location, tab, state, debouncedSearch, report.rows, pagination.totalPages]);
+
   const userOptions = useMemo(() => [...(users.length ? users : report.rows)].sort((a, b) => a.employee.localeCompare(b.employee)), [report.rows, users]);
 
   const openUserReport = useCallback((userId) => {
@@ -1120,6 +1182,7 @@ function App() {
   const resetFilters = useCallback(() => {
     lastAttendanceKeyRef.current = '';
     attendanceCacheRef.current.clear();
+    overviewEmployeesCacheRef.current.clear();
     setDatePreset('latest');
     setStartDate('');
     setEndDate('');
@@ -1258,8 +1321,8 @@ function App() {
               isExporting={isExporting}
               exportError={exportError}
               onPresetChange={onPresetChange}
-              userOptions={userOptions}
-              usersLoading={usersLoading}
+              employeeOptions={overviewEmployeeOptions}
+              employeesLoading={overviewEmployeesLoading}
             />
           ) : page === 'user-report' ? (
             <UserReportPage

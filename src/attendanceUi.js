@@ -145,3 +145,16 @@ export function filterEmployeeOptions(options, query) {
     `${user.employee} ${user.userId} ${user.location ?? ''}`.toLowerCase().includes(normalized),
   );
 }
+
+export function buildFlaggedEmployeeOptions(rows) {
+  const byId = new Map();
+  for (const row of rows) {
+    if (!row?.userId || !row.status?.length || byId.has(row.userId)) continue;
+    byId.set(row.userId, {
+      userId: row.userId,
+      employee: row.employee,
+      location: row.location,
+    });
+  }
+  return [...byId.values()].sort((a, b) => a.employee.localeCompare(b.employee));
+}
