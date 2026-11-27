@@ -245,12 +245,12 @@ Set a private `AUTH_SALT` value in `.env`, then run `pnpm credentials:generate`.
 
 ## Docker deployment
 
-On the deployment host, copy `.env.deploy.example` to `.env.deploy` and set a unique `AUTH_SALT`, strong `LOGIN_MASTER_PASSWORD`, and read-only database credentials. Keep `.env.deploy` private. Generate the normal login inside a one-off Docker container, then start the service:
+On the deployment host, copy `.env.example` to `.env` and set a unique `AUTH_SALT`, strong `LOGIN_MASTER_PASSWORD`, and read-only `DOCKER_DB_*` credentials. Keep `.env` private. Generate the normal login inside a one-off Docker container, then start the service:
 
 ```sh
-cp .env.deploy.example .env.deploy
+cp .env.example .env
 docker compose run --build --rm --entrypoint node attendance-dashboard scripts/generate-login.mjs
 docker compose up --build -d
 ```
 
-The service listens on `127.0.0.1:9200`; terminate HTTPS with a reverse proxy and forward requests to that address. `COOKIE_SECURE=true` is enabled for that TLS setup, and `shared/login.json` persists across container rebuilds.
+The service listens on `127.0.0.1:9200`; terminate HTTPS with a reverse proxy and forward requests to that address. Set `COOKIE_SECURE=true` in `.env` behind TLS, and `shared/login.json` persists across container rebuilds.

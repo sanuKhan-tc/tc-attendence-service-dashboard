@@ -4,6 +4,17 @@ services:
     image: tc-attendance-dashboard:deploy
     env_file:
       - .env
+    environment:
+      PORT: 3001
+      LOGIN_FILE: /app/shared/login.json
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      DB_DRIVER: ${DOCKER_DB_DRIVER:-tedious}
+      DB_SERVER: ${DOCKER_DB_SERVER:-host.docker.internal,1433}
+      DB_DATABASE: ${DB_DATABASE:-COSEC}
+      DB_USER: ${DOCKER_DB_USER:-}
+      DB_PASSWORD: ${DOCKER_DB_PASSWORD:-}
+      DB_ENCRYPT: ${DOCKER_DB_ENCRYPT:-false}
+      DB_CONNECTION_STRING: ${DOCKER_DB_CONNECTION_STRING:-}
     ports:
       - "127.0.0.1:9200:3001"
     extra_hosts:
