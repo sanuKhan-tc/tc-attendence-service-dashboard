@@ -387,14 +387,15 @@ test('renders the Not logged out / In office pill without a gray metric-pill wra
   );
 });
 
-test('defines subtle CSS motion tokens, tactile button clicks, and page/tab/content transitions with reduced-motion support', () => {
+test('defines smooth, unhurried CSS motion tokens, gentle button clicks, and page/tab/content transitions with reduced-motion support', () => {
   const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
   const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
   const { rules, tokens } = parseTopLevelCss(css);
 
-  for (const token of ['--ease-out', '--duration-fast', '--duration-base', '--duration-page']) {
-    assert.ok(tokens.has(token), `Expected motion token ${token} in :root`);
-  }
+  assert.equal(tokens.get('--ease-out'), 'cubic-bezier(0.4, 0, 0.2, 1)');
+  assert.ok(parseInt(tokens.get('--duration-fast') ?? '0', 10) >= 200, 'Fast transitions should be >= 200ms for smooth feel');
+  assert.ok(parseInt(tokens.get('--duration-base') ?? '0', 10) >= 320, 'Base transitions should be >= 320ms for smooth feel');
+  assert.ok(parseInt(tokens.get('--duration-page') ?? '0', 10) >= 420, 'Page transitions should be >= 420ms for smooth feel');
 
   for (const keyframe of ['tc-fade-up', 'tc-fade-in', 'tc-pop-in', 'tc-bar-grow', 'tc-fill-grow']) {
     assert.match(css, new RegExp(`@keyframes\\s+${keyframe}\\b`), `Expected @keyframes ${keyframe}`);
@@ -404,7 +405,7 @@ test('defines subtle CSS motion tokens, tactile button clicks, and page/tab/cont
   assert.match(rules.get('.content-fade') ?? '', /animation:\s*tc-fade-in\b/);
   assert.match(rules.get('.content-rise') ?? '', /animation:\s*tc-fade-up\b/);
   assert.match(rules.get('.combobox-popover') ?? '', /animation:\s*tc-pop-in\b/);
-  assert.match(css, /:active[^{]*\{[^}]*transform:\s*scale\(/s);
+  assert.match(css, /:active[^{]*\{[^}]*transform:\s*scale\(0\.985\)/s);
   assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)[\s\S]*animation:\s*none\s*!important;/);
 
   assert.match(app, /<div className="page-transition" key=\{page\}>/);

@@ -96,10 +96,10 @@
   --font-primary: Calibri, 'Proxima Nova', 'Segoe UI', Arial, sans-serif;
   --font-ui: 'Proxima Nova', Calibri, 'Segoe UI', Arial, sans-serif;
 
-  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
-  --duration-fast: 140ms;
-  --duration-base: 220ms;
-  --duration-page: 280ms;
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --duration-fast: 220ms;
+  --duration-base: 360ms;
+  --duration-page: 480ms;
 
   color: var(--tc-text);
   background: var(--tc-bg);
@@ -161,7 +161,7 @@ h4 {
 }
 
 @keyframes tc-fade-up {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(5px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -171,7 +171,7 @@ h4 {
 }
 
 @keyframes tc-pop-in {
-  from { opacity: 0; transform: translateY(-4px) scale(0.985); }
+  from { opacity: 0; transform: translateY(-2px) scale(0.992); }
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
@@ -269,7 +269,7 @@ h4 {
 }
 
 .logout-button:active {
-  transform: scale(0.97);
+  transform: scale(0.985);
 }
 
 /* Sticky Branded Header */
@@ -343,7 +343,7 @@ h4 {
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
-  transition: color 0.18s ease, border-color 0.18s ease;
+  transition: color var(--duration-fast) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 
 .nav-link:hover {
@@ -538,7 +538,7 @@ select:focus {
 
 .reset-button:active:not(:disabled),
 .primary-button:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.985);
 }
 
 .reset-button:disabled {
@@ -577,9 +577,9 @@ select:focus {
   animation: tc-fade-up var(--duration-base) var(--ease-out) both;
 }
 
-.summary-grid:not([aria-busy="true"]) .summary-card:nth-child(2) { animation-delay: 40ms; }
-.summary-grid:not([aria-busy="true"]) .summary-card:nth-child(3) { animation-delay: 80ms; }
-.summary-grid:not([aria-busy="true"]) .summary-card:nth-child(4) { animation-delay: 120ms; }
+.summary-grid:not([aria-busy="true"]) .summary-card:nth-child(2) { animation-delay: 70ms; }
+.summary-grid:not([aria-busy="true"]) .summary-card:nth-child(3) { animation-delay: 140ms; }
+.summary-grid:not([aria-busy="true"]) .summary-card:nth-child(4) { animation-delay: 210ms; }
 
 .summary-card {
   position: relative;
@@ -593,7 +593,7 @@ select:focus {
   background: var(--tc-surface);
   box-shadow: var(--tc-shadow-sm);
   overflow: hidden;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: transform var(--duration-base) var(--ease-out), box-shadow var(--duration-base) var(--ease-out), border-color var(--duration-base) var(--ease-out);
 }
 
 .summary-card::before {
@@ -744,7 +744,7 @@ select:focus {
 }
 
 .tab:active {
-  transform: scale(0.97);
+  transform: scale(0.985);
 }
 
 .tab.active {
@@ -1107,7 +1107,7 @@ tbody tr:hover .employee-cell b {
 }
 
 .pagination-controls button:active:not(:disabled) {
-  transform: scale(0.97);
+  transform: scale(0.985);
 }
 
 .pagination-controls button:disabled {
@@ -1282,7 +1282,7 @@ tbody tr:hover .employee-cell b {
   background: var(--tc-surface);
   box-shadow: 0 16px 36px rgba(31, 41, 55, 0.12);
   transform-origin: top center;
-  animation: tc-pop-in var(--duration-fast) var(--ease-out);
+  animation: tc-pop-in var(--duration-base) var(--ease-out);
 }
 
 .combobox-option {
@@ -1674,7 +1674,7 @@ tbody tr:hover .employee-cell b {
   border-radius: 6px 6px 0 0;
   background: var(--tc-blue);
   transform-origin: bottom;
-  animation: tc-bar-grow 360ms var(--ease-out) both;
+  animation: tc-bar-grow 620ms var(--ease-out) both;
 }
 
 .bar.under {
@@ -1730,7 +1730,7 @@ tbody tr:hover .employee-cell b {
   min-width: 4px;
   border-radius: inherit;
   transform-origin: left;
-  animation: tc-fill-grow 380ms var(--ease-out) both;
+  animation: tc-fill-grow 650ms var(--ease-out) both;
 }
 
 /* Site Footer */
