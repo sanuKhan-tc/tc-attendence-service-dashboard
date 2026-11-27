@@ -434,13 +434,13 @@ test('renders flagged table toolbar without heading, saffron circular reset butt
   assert.match(exportIcon, /color:\s*#ffffff;/);
 });
 
-test('uses saffron tabbed table header, dim saffron late icon bg, uniform rounded card corners, and rounded-square avatars', () => {
+test('uses neutral tabbed table header, dim saffron late icon bg, uniform rounded card corners, and rounded-square avatars', () => {
   const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
   const { rules } = parseTopLevelCss(css);
 
   const flaggedHeader = rules.get('.flagged-table thead th') ?? '';
-  assert.match(flaggedHeader, /background:\s*var\(--tc-saffron\);/);
-  assert.match(flaggedHeader, /color:\s*#ffffff;/);
+  assert.doesNotMatch(flaggedHeader, /background:\s*var\(--tc-saffron\);/);
+  assert.match(flaggedHeader, /box-shadow:\s*0\s+1px\s+0\s+var\(--tc-border\);/);
 
   const lateIcon = rules.get('.late-card .summary-icon') ?? '';
   assert.match(lateIcon, /background:\s*var\(--tc-saffron-soft\);/);

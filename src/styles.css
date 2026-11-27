@@ -858,10 +858,7 @@ th {
   position: sticky;
   top: 0;
   z-index: 2;
-  background: var(--tc-saffron);
-  color: #ffffff;
-  font-weight: 700;
-  box-shadow: 0 1px 0 var(--tc-saffron-hover);
+  box-shadow: 0 1px 0 var(--tc-border);
 }
 
 td {
