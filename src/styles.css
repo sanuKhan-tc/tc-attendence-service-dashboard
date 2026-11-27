@@ -799,6 +799,9 @@ select:focus {
 }
 
 .tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: var(--tc-bg);
@@ -811,9 +814,15 @@ select:focus {
   transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), color var(--duration-fast) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
 }
 
+.tab svg {
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+}
+
 .tab:hover:not(.active) {
-  background: var(--tc-green-soft);
-  color: var(--tc-green);
+  background: var(--tc-saffron-soft);
+  color: var(--tc-saffron-text);
 }
 
 .tab:active {
@@ -821,7 +830,7 @@ select:focus {
 }
 
 .tab.active {
-  background: var(--tc-green);
+  background: var(--tc-saffron);
   color: #ffffff;
 }
 

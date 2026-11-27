@@ -116,6 +116,22 @@ function Spinner({ light = false, size = 15 }) {
   );
 }
 
+function FlagIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z" />
+      <line x1="4" y1="22" x2="4" y2="15" />
+    </svg>
+  );
+}
+
+function tabIcon(id) {
+  if (id === 'all') return <FlagIcon />;
+  if (id === 'late') return <LateIcon />;
+  if (id === 'early') return <EarlyIcon />;
+  return <HoursIcon />;
+}
+
 function LateIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -618,7 +634,7 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
 
       <section className="flagged-card">
         <div className="flagged-toolbar">
-          <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+          <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{tabIcon(item.id)}<span>{item.label}</span></button>)}</div>
           <div className="section-actions">
             {exportError && <span className="error-message" role="alert">{exportError}</span>}
             <button className="export-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>

@@ -190,7 +190,13 @@ test('maps typography hierarchy sizes and interactive brand color roles', () => 
   assert.match(activeNav, /color:\s*var\(--tc-green\);/);
 
   const activeTab = ruleBody('.tab.active');
-  assert.match(activeTab, /background:\s*var\(--tc-green\);/);
+  assert.match(activeTab, /background:\s*var\(--tc-saffron\);/);
+  assert.match(activeTab, /color:\s*#ffffff;/);
+
+  const inactiveTab = ruleBody('.tab');
+  assert.match(inactiveTab, /background:\s*var\(--tc-bg\);/);
+  assert.match(inactiveTab, /color:\s*var\(--tc-text-secondary\);/);
+  assert.match(inactiveTab, /display:\s*inline-flex;/);
 
   const inputFocus = ruleBody('input:focus, select:focus');
   assert.match(inputFocus, /border-color:\s*var\(--tc-green\);/);
@@ -420,6 +426,8 @@ test('renders flagged table toolbar without heading, saffron circular reset butt
 
   assert.doesNotMatch(app, /<h2>Flagged staff<\/h2>/);
   assert.match(app, /className="flagged-toolbar"/);
+  assert.match(app, /function FlagIcon\(/);
+  assert.match(app, /<FlagIcon \/>[\s\S]*?<LateIcon \/>[\s\S]*?<EarlyIcon \/>[\s\S]*?<HoursIcon \/>/);
   assert.doesNotMatch(app, /Export Excel/);
   assert.doesNotMatch(app, /export-button-icon/);
   assert.match(app, /className="export-button"[\s\S]*?<ExportIcon \/>[\s\S]*?Export/);
