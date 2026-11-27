@@ -413,25 +413,35 @@ test('defines smooth, unhurried CSS motion tokens, gentle button clicks, and pag
   assert.match(app, /className="calendar-grid calendar-days content-fade" key=\{month\}/);
 });
 
-test('renders flagged table toolbar without heading, saffron circular reset button, and export button with saffron icon without Excel text', () => {
+test('renders flagged table toolbar without heading, saffron circular reset button, consistent blue export button, and flat shadow-free chrome', () => {
   const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
   const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
-  const { rules } = parseTopLevelCss(css);
+  const { rules, tokens } = parseTopLevelCss(css);
 
   assert.doesNotMatch(app, /<h2>Flagged staff<\/h2>/);
   assert.match(app, /className="flagged-toolbar"/);
   assert.doesNotMatch(app, /Export Excel/);
-  assert.match(app, /className="reset-button export-button"[\s\S]*?<span className="export-button-icon"><ExportIcon \/><\/span>[\s\S]*?Export/);
+  assert.doesNotMatch(app, /export-button-icon/);
+  assert.match(app, /className="export-button"[\s\S]*?<ExportIcon \/>[\s\S]*?Export/);
   assert.match(app, /className="icon-reset-button"[^>]*aria-label="Reset filters"[^>]*><ResetIcon \/><\/button>/);
 
   const resetIconBtn = rules.get('.icon-reset-button') ?? '';
   assert.match(resetIconBtn, /border-radius:\s*50%;/);
   assert.match(resetIconBtn, /background:\s*var\(--tc-saffron\);/);
   assert.match(resetIconBtn, /color:\s*#ffffff;/);
+  assert.doesNotMatch(resetIconBtn, /box-shadow\s*:/i);
 
-  const exportIcon = rules.get('.export-button-icon') ?? '';
-  assert.match(exportIcon, /background:\s*var\(--tc-saffron\);/);
-  assert.match(exportIcon, /color:\s*#ffffff;/);
+  const exportBtn = rules.get('.export-button') ?? '';
+  assert.match(exportBtn, /background:\s*var\(--tc-blue\);/);
+  assert.match(exportBtn, /color:\s*#ffffff;/);
+  assert.doesNotMatch(exportBtn, /box-shadow\s*:/i);
+
+  assert.equal(tokens.get('--tc-shadow-sm'), 'none');
+  assert.equal(tokens.get('--tc-shadow-md'), 'none');
+  assert.equal(tokens.get('--tc-shadow-green'), 'none');
+  assert.doesNotMatch(rules.get('.top-header') ?? '', /box-shadow\s*:/i);
+  assert.doesNotMatch(rules.get('.tab.active') ?? '', /box-shadow\s*:/i);
+  assert.doesNotMatch(rules.get('.combobox-popover') ?? '', /box-shadow\s*:/i);
 });
 
 test('uses neutral tabbed table header, dim saffron late icon bg, uniform rounded card corners, and rounded-square avatars', () => {

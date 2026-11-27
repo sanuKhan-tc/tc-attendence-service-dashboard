@@ -621,8 +621,8 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
           <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
           <div className="section-actions">
             {exportError && <span className="error-message" role="alert">{exportError}</span>}
-            <button className="reset-button export-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>
-              <span className="export-button-icon"><ExportIcon /></span>
+            <button className="export-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>
+              <ExportIcon />
               <span>{isExporting ? 'Exporting…' : 'Export'}</span>
             </button>
           </div>
@@ -764,8 +764,8 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <p className="page-subtitle">Review attendance for one employee across selected dates.</p>
           </div>
           <div className="section-actions">
-            <button className="reset-button export-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>
-              <span className="export-button-icon"><ExportIcon /></span>
+            <button className="export-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>
+              <ExportIcon />
               <span>Export</span>
             </button>
           </div>
