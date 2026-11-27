@@ -364,8 +364,13 @@ test('styles the three overview KPI cards with the three brand colors, saffron s
   assert.match(summaryCard, /grid-template-columns:\s*1fr\s+auto;/i);
 
   const summaryIcon = rules.get('.summary-icon') ?? '';
-  assert.match(summaryIcon, /background:\s*transparent;/i);
-  assert.doesNotMatch(summaryIcon, /var\(--accent-bg\)/i);
+  assert.match(summaryIcon, /border-radius:\s*50%;/);
+  assert.match(summaryIcon, /background:\s*var\(--accent-bg\);/);
+
+  assert.match(rules.get('.late-card') ?? '', /--accent-bg:\s*var\(--tc-saffron-soft\);/);
+  assert.match(rules.get('.early-card') ?? '', /--accent-bg:\s*var\(--tc-blue-soft\);/);
+  assert.match(rules.get('.hours-card') ?? '', /--accent-bg:\s*var\(--tc-green-soft\);/);
+  assert.match(rules.get('.present-card') ?? '', /--accent-bg:\s*var\(--tc-blue-soft\);/);
 
   const summaryHeading = rules.get('.summary-heading') ?? '';
   assert.match(summaryHeading, /font-size:\s*18px;/);
@@ -459,9 +464,6 @@ test('uses neutral tabbed table header, dim saffron late icon bg, uniform rounde
   const flaggedHeader = rules.get('.flagged-table thead th') ?? '';
   assert.doesNotMatch(flaggedHeader, /background:\s*var\(--tc-saffron\);/);
   assert.match(flaggedHeader, /box-shadow:\s*0\s+1px\s+0\s+var\(--tc-border\);/);
-
-  const lateIcon = rules.get('.late-card .summary-icon') ?? '';
-  assert.match(lateIcon, /background:\s*var\(--tc-saffron-soft\);/);
 
   assert.match(rules.get('.summary-card') ?? '', /border-radius:\s*16px;/);
   assert.match(rules.get('.calendar-card') ?? '', /border-radius:\s*16px;/);

@@ -666,21 +666,25 @@ select:focus {
 
 .late-card {
   --accent: var(--tc-saffron);
+  --accent-bg: var(--tc-saffron-soft);
   --accent-border: var(--tc-saffron-border);
 }
 
 .early-card {
   --accent: var(--tc-blue);
+  --accent-bg: var(--tc-blue-soft);
   --accent-border: var(--tc-blue-border);
 }
 
 .hours-card {
   --accent: var(--tc-green);
+  --accent-bg: var(--tc-green-soft);
   --accent-border: var(--tc-green-border);
 }
 
 .present-card {
   --accent: var(--tc-blue);
+  --accent-bg: var(--tc-blue-soft);
   --accent-border: var(--tc-blue-border);
 }
 
@@ -702,18 +706,14 @@ select:focus {
 
 .summary-icon {
   display: inline-flex;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  background: transparent;
+  border-radius: 50%;
+  background: var(--accent-bg);
   color: var(--accent);
   flex-shrink: 0;
-}
-
-.late-card .summary-icon {
-  background: var(--tc-saffron-soft);
 }
 
 .summary-card strong {
@@ -1488,9 +1488,9 @@ tbody tr:hover .employee-cell b {
 }
 
 .skeleton-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
   flex-shrink: 0;
 }
 
