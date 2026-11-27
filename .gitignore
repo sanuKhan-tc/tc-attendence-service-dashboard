@@ -11,6 +11,7 @@ public/changelog.json
 .env
 .env.*
 !.env.example
+shared/
 
 # Logs
 *.log

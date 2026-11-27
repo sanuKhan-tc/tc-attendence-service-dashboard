@@ -6,6 +6,7 @@
     "predev": "node scripts/generate-changelog.mjs",
     "dev": "concurrently \"node server/index.js\" \"vite\"",
     "server": "node server/index.js",
+    "credentials:generate": "node scripts/generate-login.mjs",
     "prebuild": "node scripts/generate-changelog.mjs",
     "build": "vite build",
     "test": "node --test",

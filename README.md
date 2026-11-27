@@ -239,3 +239,6 @@ pnpm build
 ```
 
 The repository also includes `.gitignore`, `.gitattributes`, and `.editorconfig` for local secrets, generated files, line endings, and editor consistency.
+# Dashboard login
+
+Set a private `AUTH_SALT` value in `.env`, then run `pnpm credentials:generate`. The script creates `shared/login.json` with the `admin` username and a salted SHA-256 password hash, and prints the generated password once. Keep `.env` and the shared volume private. Run the script again to rotate the password. Docker mounts `./shared` so credentials survive container rebuilds.

@@ -43,6 +43,16 @@ button { cursor: pointer; }
   flex-direction: column;
 }
 
+.login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(ellipse at 50% 0%, #fff1ee, var(--tc-bg) 58%); }
+.login-card { width: min(100%, 410px); display: grid; gap: 18px; padding: 38px; border: 1px solid var(--tc-border); border-radius: 18px; background: #fff; box-shadow: var(--tc-shadow-md); }
+.login-card > img { margin-bottom: 12px; }
+.login-card h1 { font-size: 27px; }
+.login-card p { margin: -12px 0 2px; color: var(--tc-text-muted); }
+.login-field { display: grid; gap: 7px; color: var(--tc-indigo); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.login-field input { width: 100%; min-height: 42px; padding: 9px 12px; border: 1px solid var(--tc-border-strong); border-radius: 8px; text-transform: none; }
+.login-error { margin: 0 !important; color: #c72446 !important; font-size: 13px; }
+.logout-button { position: fixed; right: 16px; top: 20px; z-index: 21; border: 1px solid var(--tc-border); border-radius: 8px; padding: 8px 12px; background: #fff; color: var(--tc-indigo); font-weight: 700; }
+
 /* Sticky Branded Header */
 .top-header {
   position: sticky;

@@ -875,6 +875,8 @@ function ChangelogPage() {
 }
 
 function App() {
+  const [authenticated, setAuthenticated] = useState(null);
+  useEffect(() => { fetch('/api/session').then((response) => response.json()).then((result) => setAuthenticated(result.authenticated)).catch(() => setAuthenticated(false)); }, []);
   const [page, setPage] = useState(pageFromHash);
   const [datePreset, setDatePreset] = useState('latest');
   const [startDate, setStartDate] = useState('');
@@ -921,7 +923,7 @@ function App() {
 
   // Lazy-load /api/attendance/users only when User Reports is opened, with AbortController
   useEffect(() => {
-    if (page !== 'user-report' || usersLoadedRef.current) return undefined;
+    if (!authenticated || page !== 'user-report' || usersLoadedRef.current) return undefined;
 
     const controller = new AbortController();
     setUsersLoading(true);
@@ -947,7 +949,7 @@ function App() {
       });
 
     return () => controller.abort();
-  }, [page]);
+  }, [authenticated, page]);
 
   // Abort any in-flight user history request when leaving User Reports or unmounting
   useEffect(() => {
@@ -967,7 +969,7 @@ function App() {
 
   // Lazy-load /api/attendance only when Dashboard is active, with client-side TTL cache & AbortController
   useEffect(() => {
-    if (page !== 'dashboard') return undefined;
+    if (!authenticated || page !== 'dashboard') return undefined;
 
     const params = buildAttendanceParams({
       pageNumber,
@@ -1031,7 +1033,7 @@ function App() {
       });
 
     return () => controller.abort();
-  }, [page, startDate, endDate, location, pageNumber, debouncedSearch, tab]);
+  }, [authenticated, page, startDate, endDate, location, pageNumber, debouncedSearch, tab]);
 
   const userOptions = useMemo(() => [...(users.length ? users : report.rows)].sort((a, b) => a.employee.localeCompare(b.employee)), [report.rows, users]);
 
@@ -1132,10 +1134,10 @@ function App() {
   }, [historyFrom, historyPreset, historyTo, selectedUserId]);
 
   useEffect(() => {
-    if (page !== 'user-report' || !selectedUserId || !historyLoadRequestedRef.current) return;
+    if (!authenticated || page !== 'user-report' || !selectedUserId || !historyLoadRequestedRef.current) return;
     historyLoadRequestedRef.current = false;
     loadUserHistory();
-  }, [page, selectedUserId, loadUserHistory]);
+  }, [authenticated, page, selectedUserId, loadUserHistory]);
 
   const exportOverview = useCallback(async () => {
     setIsExporting(true);
@@ -1157,9 +1159,13 @@ function App() {
     }
   }, [debouncedSearch, endDate, location, startDate, tab]);
 
+  if (authenticated === null) return <main className="login-screen"><p>Loading…</p></main>;
+  if (!authenticated) return <LoginScreen onLogin={() => setAuthenticated(true)} />;
+
   return (
     <div className="app-layout">
       <Navigation page={page} dataSource={DATA_SOURCE_LABEL} />
+      <button className="logout-button" onClick={async () => { await fetch('/api/logout', { method: 'POST' }); setAuthenticated(false); }}>Sign out</button>
       <main className="app-shell">
         {page === 'dashboard' ? (
           <DashboardPage
@@ -1222,6 +1228,29 @@ function App() {
       </footer>
     </div>
   );
+}
+
+function LoginScreen({ onLogin }) {
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function submit(event) {
+    event.preventDefault(); setBusy(true); setError('');
+    try {
+      const response = await fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(Object.fromEntries(new FormData(event.currentTarget))) });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      onLogin();
+    } catch (loginError) { setError(loginError.message || 'Unable to sign in.'); }
+    finally { setBusy(false); }
+  }
+  return <main className="login-screen"><form className="login-card" onSubmit={submit}>
+    <img src="/techcarrot-logo.svg" alt="techcarrot" width="136" />
+    <span className="hero-eyebrow">Attendance portal</span><h1>Welcome back</h1><p>Sign in to view attendance insights.</p>
+    <label className="login-field">Username<input name="username" autoComplete="username" required autoFocus /></label>
+    <label className="login-field">Password<input name="password" type="password" autoComplete="current-password" required /></label>
+    {error && <p className="login-error" role="alert">{error}</p>}
+    <button className="primary-button" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+  </form></main>;
 }
 
 export default App;
