@@ -412,3 +412,24 @@ test('defines smooth, unhurried CSS motion tokens, gentle button clicks, and pag
   assert.match(app, /<tbody className="content-fade" key=\{`\$\{tab\}-\$\{pagination\.page\}-\$\{state\}`\}>/);
   assert.match(app, /className="calendar-grid calendar-days content-fade" key=\{month\}/);
 });
+
+test('renders flagged table toolbar without heading, saffron circular reset button, and export button with saffron icon without Excel text', () => {
+  const app = fs.readFileSync(path.join(ROOT, 'src', 'App.jsx'), 'utf8');
+  const css = fs.readFileSync(path.join(ROOT, 'src', 'styles.css'), 'utf8');
+  const { rules } = parseTopLevelCss(css);
+
+  assert.doesNotMatch(app, /<h2>Flagged staff<\/h2>/);
+  assert.match(app, /className="flagged-toolbar"/);
+  assert.doesNotMatch(app, /Export Excel/);
+  assert.match(app, /className="reset-button export-button"[\s\S]*?<span className="export-button-icon"><ExportIcon \/><\/span>[\s\S]*?Export/);
+  assert.match(app, /className="icon-reset-button"[^>]*aria-label="Reset filters"[^>]*><ResetIcon \/><\/button>/);
+
+  const resetIconBtn = rules.get('.icon-reset-button') ?? '';
+  assert.match(resetIconBtn, /border-radius:\s*50%;/);
+  assert.match(resetIconBtn, /background:\s*var\(--tc-saffron\);/);
+  assert.match(resetIconBtn, /color:\s*#ffffff;/);
+
+  const exportIcon = rules.get('.export-button-icon') ?? '';
+  assert.match(exportIcon, /background:\s*var\(--tc-saffron\);/);
+  assert.match(exportIcon, /color:\s*#ffffff;/);
+});

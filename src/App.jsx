@@ -184,6 +184,25 @@ function CheckIcon() {
   );
 }
 
+function ResetIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+      <path d="M3 3v5h5" />
+    </svg>
+  );
+}
+
+function ExportIcon() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  );
+}
+
 const Navigation = memo(function Navigation({ page, dataSource }) {
   return (
     <header className="top-header">
@@ -592,14 +611,22 @@ function DashboardPage({ datePreset, setDatePreset, startDate, setStartDate, end
           <span>Employee</span>
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search name or employee ID" />
         </label>
-        <button className="reset-button" type="button" onClick={resetFilters}>Reset filters</button>
+        <button className="icon-reset-button" type="button" onClick={resetFilters} title="Reset filters" aria-label="Reset filters"><ResetIcon /></button>
       </section>
 
       {isLoading ? <SummaryCardsSkeleton /> : <SummaryCards summary={report.summary} />}
 
       <section className="flagged-card">
-        <div className="section-title"><h2>Flagged staff</h2><div className="section-actions">{exportError && <span className="error-message" role="alert">{exportError}</span>}<button className="reset-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>{isExporting ? 'Preparing export…' : 'Export Excel'}</button></div></div>
-        <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+        <div className="flagged-toolbar">
+          <div className="tabs" role="tablist" aria-label="Flagged staff filters">{TABS.map((item) => <button key={item.id} type="button" className={tab === item.id ? 'tab active' : 'tab'} onClick={() => setTab(item.id)}>{item.label}</button>)}</div>
+          <div className="section-actions">
+            {exportError && <span className="error-message" role="alert">{exportError}</span>}
+            <button className="reset-button export-button" type="button" onClick={onExport} disabled={state !== 'ready' || pagination.total === 0 || isExporting}>
+              <span className="export-button-icon"><ExportIcon /></span>
+              <span>{isExporting ? 'Exporting…' : 'Export'}</span>
+            </button>
+          </div>
+        </div>
         <div className="table-wrap flagged-table-wrap" aria-busy={isLoading}><table className="flagged-table"><thead><tr><th>Employee</th><th>Date</th><th>Location</th>{!isDateRange && <><th>First in</th><th>Last out</th><th>Total hours</th></>}{isDateRange && <th>Status</th>}</tr></thead><tbody className="content-fade" key={`${tab}-${pagination.page}-${state}`}>
           {isLoading && <TableRowsSkeleton rows={6} showEmployee showDate showTimes={!isDateRange} showDuration={!isDateRange} showStatus={isDateRange} />}
           {state === 'error' && <tr><td colSpan={columnCount} className="table-message error-message">{error}</td></tr>}
@@ -736,7 +763,12 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
             <h2>User report</h2>
             <p className="page-subtitle">Review attendance for one employee across selected dates.</p>
           </div>
-          <div className="section-actions"><button className="reset-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>Export Excel</button></div>
+          <div className="section-actions">
+            <button className="reset-button export-button" type="button" onClick={() => exportAttendanceExcel(visibleHistory, `attendance-${selectedUserId || 'user'}-${historyFrom || 'from'}-to-${historyTo || 'to'}`)} disabled={historyState !== 'ready' || !visibleHistory.length}>
+              <span className="export-button-icon"><ExportIcon /></span>
+              <span>Export</span>
+            </button>
+          </div>
         </div>
         <div className="history-controls">
           <div className="control-field employee-combobox-field">
@@ -770,7 +802,7 @@ function UserReportPage({ userOptions, usersLoading, selectedUserId, setSelected
               'Load report'
             )}
           </button>
-          <button className="reset-button" type="button" onClick={resetHistoryFilters}>Reset filters</button>
+          <button className="icon-reset-button" type="button" onClick={resetHistoryFilters} title="Reset filters" aria-label="Reset filters"><ResetIcon /></button>
         </div>
         {historyState === 'idle' && <p className="history-message">Select an employee and date range to view attendance history.</p>}
         {isHistoryLoading && (

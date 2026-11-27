@@ -565,6 +565,54 @@ select:focus {
   box-shadow: none;
 }
 
+.icon-reset-button {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--tc-saffron);
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(231, 76, 45, 0.24);
+  transition: transform var(--duration-fast) var(--ease-out), background var(--duration-fast) var(--ease-out), box-shadow var(--duration-base) var(--ease-out);
+}
+
+.icon-reset-button:hover {
+  background: var(--tc-saffron-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(231, 76, 45, 0.3);
+}
+
+.icon-reset-button:active {
+  transform: scale(0.985);
+}
+
+.export-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px 0 6px;
+}
+
+.export-button-icon {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--tc-saffron);
+  color: #ffffff;
+  flex-shrink: 0;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.export-button:hover:not(:disabled) .export-button-icon {
+  background: var(--tc-saffron-hover);
+}
+
 /* Signature Asymmetric Organic KPI Summary Cards */
 .summary-grid {
   display: grid;
@@ -717,7 +765,21 @@ select:focus {
   font-weight: 500;
 }
 
-/* Pill Tabs */
+/* Pill Tabs & Table Toolbar */
+.flagged-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 16px 22px;
+  border-bottom: 1px solid var(--tc-border);
+}
+
+.flagged-toolbar .tabs {
+  padding: 0;
+  border-bottom: 0;
+}
+
 .tabs {
   display: flex;
   gap: 8px;
@@ -1804,6 +1866,10 @@ tbody tr:hover .employee-cell b {
   label, .employee-filter, .control-field, .employee-combobox-field { width: 100%; min-width: 0; }
   .reset-button, .primary-button { width: 100%; }
   .tabs { overflow-x: auto; padding-left: 16px; padding-right: 16px; }
+  .flagged-toolbar { flex-wrap: wrap; padding: 14px 16px; gap: 10px; }
+  .flagged-toolbar .tabs { width: 100%; padding: 0; }
+  .flagged-toolbar .section-actions { margin-left: auto; }
+  .flagged-toolbar .export-button { width: auto; }
   .section-title { align-items: flex-start; gap: 8px; flex-direction: column; padding: 16px 16px 10px; }
   .site-footer { width: calc(100% - 24px); flex-direction: column; align-items: flex-start; }
   .changelog-entry { grid-template-columns: 1fr; gap: 8px; padding: 18px; }
